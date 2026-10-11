@@ -24,6 +24,9 @@ desktop Quick Settings panel or connected audio hardware.
 - Disconnect/reconnect USB or Bluetooth endpoints and change defaults in another application.
 - Stop/start the agent. Restart ShellHost and the audio service in a controlled test environment.
 - Reinstall over a running version, then uninstall; verify file and startup cleanup.
+- Check for updates in controls and via the inline settings entry point. Verify
+  the up-to-date result, a newer version, offline recovery, and a normal installer
+  handoff. Check that portable copies open Releases instead of replacing files.
 
 The public release notes should distinguish completed tests from untested hardware
 and OS variants. This project has so far been tested on x64 build 26300.9457.
@@ -52,3 +55,18 @@ interaction introduced in 0.1.1 still needs user visual confirmation.
   restoration, and unchanged audio defaults.
 - Compact rename code reviewed for fixed row height, single-line overflow,
   keyboard cancellation, and completion of the specific save request.
+
+## Completed for 0.2.0
+
+- Local build and version checks; upgrade of the running 0.1.1 per-user installation.
+- Stable numeric version comparison and downgrade/prerelease rejection.
+- Rejected unrelated URLs, credentials in URLs, non-HTTPS, wrong ports, missing
+  SHA-256, changed bytes, and truncated downloads.
+- Live GitHub API lookup and installer download with both memory and on-disk
+  SHA-256 verification. The downloaded test installer was not executed.
+- Cancellation rejected a download before execution.
+- Real IPC alias, visibility, startup restoration, and unchanged audio defaults.
+
+The update-window visual check and button-driven installer handoff have not yet
+been exercised through UI automation: access approval for QuickAudio timed out.
+The normal installer upgrade path was exercised independently and passed.

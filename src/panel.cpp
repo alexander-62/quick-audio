@@ -126,6 +126,8 @@ struct View:std::enable_shared_from_this<View>{
         startup=ctl::CheckBox();startup.Content(winrt::box_value(L"Запускать вместе с Windows"));startup.FontSize(13);groups.Children().Append(startup);
         startup.Checked([weak](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())if(!self->updatingSettings)self->Request(7,1,L"");});
         startup.Unchecked([weak](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())if(!self->updatingSettings)self->Request(7,0,L"");});
+        ctl::Button updates;updates.Content(winrt::box_value(L"Проверить обновления…"));updates.FontSize(13);updates.HorizontalAlignment(xaml::HorizontalAlignment::Stretch);groups.Children().Append(updates);
+        ctl::ToolTipService::SetToolTip(updates,winrt::box_value(L"Открыть окно обновлений QuickAudio"));updates.Click([weak](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())self->Request(8,0,L"");});
         auto hint=Label(L"Флажок показывает устройство. Карандаш — переименовать, \u2713 или Enter — сохранить, Esc — отменить. Пустое имя вернёт исходное.",12);hint.TextWrapping(xaml::TextWrapping::Wrap);hint.Opacity(0.75);groups.Children().Append(hint);
         for(int f=0;f<2;++f){auto header=Label(f?L"Микрофоны":L"Устройства вывода",13);header.FontWeight({600});header.Margin({0,8,0,0});groups.Children().Append(header);settingsItems[f]=ctl::StackPanel();settingsItems[f].Spacing(4);groups.Children().Append(settingsItems[f]);}
         settingsButton.Click([weak](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())self->ShowSettings(!self->settingsOpen);});

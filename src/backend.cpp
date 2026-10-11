@@ -153,6 +153,7 @@ int Run() {
                     if(WritePrivateProfileStringW(L"Audio",L"SyncCalls",request.flow?L"1":L"0",SettingsFile().c_str()))current.syncCalls=request.flow?1:0;else hr=HRESULT_FROM_WIN32(GetLastError());
                 }
                 else if(request.kind==7){hr=HRESULT_FROM_WIN32(SetStartup(request.flow!=0,ExePath()));}
+                else if(request.kind==8){hr=reinterpret_cast<INT_PTR>(ShellExecuteW(nullptr,L"open",ExePath().c_str(),L"--updates",nullptr,SW_SHOWNORMAL))>32?S_OK:E_FAIL;}
                 else if(request.kind==4 || request.kind==5 || request.kind==6){
                     bool known=false;if(request.flow<2)for(DWORD i=0;i<current.count[request.flow];++i)if(!wcscmp(current.devices[request.flow][i].id,request.commandId))known=true;
                     if(!known)hr=E_INVALIDARG;
@@ -195,7 +196,7 @@ int Inspect(bool roundtrip) {
 int wmain(int argc,wchar_t** argv) {
     std::wstring action=argc>1?argv[1]:L"--settings";
     if(action==L"--version"){Print(QA_VERSION_W L"\n");return 0;}
-    if(action==L"--settings")return ShowManager(GetModuleHandleW(nullptr));
+    if(action==L"--settings" || action==L"--updates")return ShowManager(GetModuleHandleW(nullptr),action==L"--updates");
     if(action==L"--prepare-update")return PrepareUpdate();
     if(action==L"--list" || action==L"--check"){auto result=Inspect(action==L"--check");CoUninitialize();return result;}
     if(action==L"--stop")return StopAgent();

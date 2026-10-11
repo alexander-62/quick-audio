@@ -28,6 +28,7 @@ Device connections or intentional visibility changes can legitimately change hei
 | Command | Purpose |
 | --- | --- |
 | `--settings` (default) | Open the standalone control window |
+| `--updates` | Open controls and start a user-requested update check |
 | `--run` | Run the background agent without a console |
 | `--stop` | Gracefully stop the agent and remove its UI |
 | `--autostart` | Enable startup for the current user |
@@ -49,5 +50,19 @@ This releases Windows' DLL file lock for updates and clean uninstall.
 4. Ensure GitHub Actions passes and tag `vX.Y.Z`.
 5. Publish installer, portable ZIP, and SHA256SUMS.txt on that release.
 
-There is no automatic updater. Keep the Inno Setup AppId stable across releases
+The manual updater in `src/updater.h` uses WinHTTP and Windows.Data.Json. It accepts
+stable numeric three-part tags only, matches the exact x64 installer asset and
+repository download URL, and requires the GitHub asset's SHA-256 and exact size.
+Redirects are followed manually through a small HTTPS GitHub/CDN allowlist.
+Requests have timeouts, total download limits, and no authentication or cookies.
+SHA-256 is verified before writing and again from a read-locked file before launch.
+Network work runs on worker threads; no requests occur in the audio agent's loop.
+IPC request 8 opens `--updates` in a separate process so ShellHost does not make requests.
+Portable installations open Releases rather than overwrite their running folder.
+
+`tests/build-updater.cmd` and `build/updater-test.exe` test metadata and validation.
+`build/updater-test.exe --live` additionally checks GitHub and downloads/verifies
+the current installer without executing it; its temporary download is removed.
+
+Keep the Inno Setup AppId stable across releases
 so installing a later version updates the existing per-user product.

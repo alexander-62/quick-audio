@@ -16,6 +16,12 @@ jobs:
       - name: Verify version metadata
         shell: pwsh
         run: ./tests/smoke.ps1
+      - name: Test update validation
+        shell: cmd
+        run: |
+          call tests\build-updater.cmd
+          if errorlevel 1 exit /b 1
+          build\updater-test.exe
       - name: Build installer and portable package
         shell: pwsh
         run: ./scripts/package.ps1

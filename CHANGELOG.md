@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0 — 2026-10-11
+
+- Manual update checking in controls and an entry point in the inline panel settings.
+- Background installer download with exact release asset size and SHA-256 validation.
+- Stable semantic version comparison, HTTPS GitHub/CDN restrictions, bounded requests.
+- Installer handoff preserving preferences; portable copies open the release page.
+- Update validation tests in CI; display scaling applied to the control window.
+
 ## 0.1.1 — 2026-10-11
 
 - Compact, single-line device settings: visibility checkbox, display name, and pencil button.
