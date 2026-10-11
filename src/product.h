@@ -3,6 +3,7 @@
 #include <shlobj.h>
 #include <string>
 #include "version.h"
+#include "language.h"
 namespace qa {
 inline std::wstring DataDir(){
     // Never invoke shell COM folder resolution on ShellHost's UI thread.
@@ -36,3 +37,4 @@ inline LONG SetStartup(bool enabled,std::wstring const& executable){
     if(!error && RegOpenKeyExW(HKEY_CURRENT_USER,ApprovedKey,0,KEY_SET_VALUE,&key)==ERROR_SUCCESS){RegDeleteValueW(key,L"QuickAudio");RegCloseKey(key);}return error;
 }
 }
+

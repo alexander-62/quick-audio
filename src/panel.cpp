@@ -73,14 +73,14 @@ struct View:std::enable_shared_from_this<View>{
             Feedback(true);for(auto& group:settingRows)for(auto& row:group){row.checkbox.IsEnabled(false);row.save.IsEnabled(false);row.editor.IsEnabled(false);}
             Log(L"UI_REQUEST kind="+std::to_wstring(kind)+L" flow="+std::to_wstring(flow)+L" id="+id+L" panelHeight="+std::to_wstring(panel.ActualHeight()));return true;
         }
-        Feedback(false,L"Подождите завершения переключения и попробуйте снова.");return false;
+        Feedback(false,qa::Text(L"Подождите завершения переключения и попробуйте снова.",L"Wait for switching to finish and try again."));return false;
     }
     void SetEditing(SettingRow& row,bool editing,bool focus=false){
         row.editing=editing;
         row.label.Visibility(editing?xaml::Visibility::Collapsed:xaml::Visibility::Visible);
         row.editor.Visibility(editing?xaml::Visibility::Visible:xaml::Visibility::Collapsed);
         row.actionIcon.Glyph(editing?L"\uE73E":L"\uE70F");
-        std::wstring action=editing?L"Сохранить название":L"Переименовать устройство";
+        std::wstring action=editing?qa::Text(L"Сохранить название",L"Save name"):qa::Text(L"Переименовать устройство",L"Rename device");
         ctl::ToolTipService::SetToolTip(row.save,winrt::box_value(action));
         xaml::Automation::AutomationProperties::SetName(row.save,action+L": "+std::wstring(row.device.name));
         if(editing){
@@ -119,17 +119,17 @@ struct View:std::enable_shared_from_this<View>{
     void BuildSettings(){
         auto weak=weak_from_this();settingsPage=ctl::StackPanel();settingsPage.Spacing(6);settingsPage.Visibility(xaml::Visibility::Collapsed);content.Children().Append(settingsPage);
         ctl::Grid heading;Column(heading,36);Column(heading,1,true);ctl::Button back;back.Content(winrt::box_value(L"\u2190"));back.Width(32);back.Height(32);back.MinWidth(0);back.Padding({0,0,0,0});heading.Children().Append(back);
-        xaml::Automation::AutomationProperties::SetName(back,L"Вернуться к выбору устройств");back.Click([weak](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())self->ShowSettings(false);});
+        xaml::Automation::AutomationProperties::SetName(back,qa::Text(L"Вернуться к выбору устройств",L"Back to device selection"));back.Click([weak](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())self->ShowSettings(false);});
         auto title=Label(L"QuickAudio " QA_VERSION_W,15);title.FontWeight({600});title.VerticalAlignment(xaml::VerticalAlignment::Center);ctl::Grid::SetColumn(title,1);heading.Children().Append(title);settingsPage.Children().Append(heading);
         settingsScroll=ctl::ScrollViewer();settingsScroll.MaxHeight(240);settingsScroll.VerticalScrollBarVisibility(ctl::ScrollBarVisibility::Auto);settingsScroll.HorizontalScrollBarVisibility(ctl::ScrollBarVisibility::Disabled);
         ctl::StackPanel groups;groups.Spacing(6);settingsScroll.Content(groups);settingsPage.Children().Append(settingsScroll);
-        startup=ctl::CheckBox();startup.Content(winrt::box_value(L"Запускать вместе с Windows"));startup.FontSize(13);groups.Children().Append(startup);
+        startup=ctl::CheckBox();startup.Content(winrt::box_value(qa::Text(L"Запускать вместе с Windows",L"Start with Windows")));startup.FontSize(13);groups.Children().Append(startup);
         startup.Checked([weak](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())if(!self->updatingSettings)self->Request(7,1,L"");});
         startup.Unchecked([weak](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())if(!self->updatingSettings)self->Request(7,0,L"");});
-        ctl::Button updates;updates.Content(winrt::box_value(L"Проверить обновления…"));updates.FontSize(13);updates.HorizontalAlignment(xaml::HorizontalAlignment::Stretch);groups.Children().Append(updates);
-        ctl::ToolTipService::SetToolTip(updates,winrt::box_value(L"Открыть окно обновлений QuickAudio"));updates.Click([weak](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())self->Request(8,0,L"");});
-        auto hint=Label(L"Флажок показывает устройство. Карандаш — переименовать, \u2713 или Enter — сохранить, Esc — отменить. Пустое имя вернёт исходное.",12);hint.TextWrapping(xaml::TextWrapping::Wrap);hint.Opacity(0.75);groups.Children().Append(hint);
-        for(int f=0;f<2;++f){auto header=Label(f?L"Микрофоны":L"Устройства вывода",13);header.FontWeight({600});header.Margin({0,8,0,0});groups.Children().Append(header);settingsItems[f]=ctl::StackPanel();settingsItems[f].Spacing(4);groups.Children().Append(settingsItems[f]);}
+        ctl::Button updates;updates.Content(winrt::box_value(qa::Text(L"Проверить обновления…",L"Check for updates…")));updates.FontSize(13);updates.HorizontalAlignment(xaml::HorizontalAlignment::Stretch);groups.Children().Append(updates);
+        ctl::ToolTipService::SetToolTip(updates,winrt::box_value(qa::Text(L"Открыть окно обновлений QuickAudio",L"Open QuickAudio updates")));updates.Click([weak](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())self->Request(8,0,L"");});
+        auto hint=Label(qa::Text(L"Флажок показывает устройство. Карандаш — переименовать, \u2713 или Enter — сохранить, Esc — отменить. Пустое имя вернёт исходное.",L"Check to show a device. Pencil: rename; \u2713 or Enter: save; Esc: cancel. Clear the name to restore the original."),12);hint.TextWrapping(xaml::TextWrapping::Wrap);hint.Opacity(0.75);groups.Children().Append(hint);
+        for(int f=0;f<2;++f){auto header=Label(f?qa::Text(L"Микрофоны",L"Microphones"):qa::Text(L"Устройства вывода",L"Output devices"),13);header.FontWeight({600});header.Margin({0,8,0,0});groups.Children().Append(header);settingsItems[f]=ctl::StackPanel();settingsItems[f].Spacing(4);groups.Children().Append(settingsItems[f]);}
         settingsButton.Click([weak](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())self->ShowSettings(!self->settingsOpen);});
     }
     void UpdateSettings(qa::State const& state,bool busy){
@@ -147,7 +147,7 @@ struct View:std::enable_shared_from_this<View>{
                     row.checkbox.Checked([weak,id,f](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())if(!self->updatingSettings)self->Request(5,f,id);});
                     row.checkbox.Unchecked([weak,id,f](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())if(!self->updatingSettings)self->Request(4,f,id);});
                     row.editor=ctl::TextBox();row.editor.FontSize(13);row.editor.MaxLength(255);row.editor.Height(32);row.editor.MinHeight(0);row.editor.Padding({6,4,6,4});row.editor.VerticalAlignment(xaml::VerticalAlignment::Center);row.editor.Margin({0,0,4,0});row.editor.PlaceholderText(row.device.name);row.editor.IsSpellCheckEnabled(false);row.editor.AcceptsReturn(false);row.editor.TextWrapping(xaml::TextWrapping::NoWrap);ctl::Grid::SetColumn(row.editor,1);entry.Children().Append(row.editor);
-                    xaml::Automation::AutomationProperties::SetName(row.editor,L"Название в панели: "+std::wstring(row.device.name));
+                    xaml::Automation::AutomationProperties::SetName(row.editor,qa::Text(L"Название в панели: ",L"Panel name: ")+std::wstring(row.device.name));
                     row.save=ctl::Button();row.save.MinWidth(0);row.save.MinHeight(0);row.save.Padding({0,0,0,0});row.save.Width(32);row.save.Height(32);row.save.VerticalAlignment(xaml::VerticalAlignment::Center);ctl::Grid::SetColumn(row.save,2);entry.Children().Append(row.save);
                     row.actionIcon=ctl::FontIcon();row.actionIcon.FontFamily(media::FontFamily(L"Segoe Fluent Icons"));row.actionIcon.FontSize(14);row.save.Content(row.actionIcon);SetEditing(row,false);
                     row.save.Click([weak,id,f](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())self->RenameAction(f,id);});
@@ -157,14 +157,14 @@ struct View:std::enable_shared_from_this<View>{
                     });
                     settingsItems[f].Children().Append(entry);rows.push_back(std::move(row));
                 }
-                if(rows.empty())settingsItems[f].Children().Append(Label(L"Доступных устройств нет",12));
+                if(rows.empty())settingsItems[f].Children().Append(Label(qa::Text(L"Доступных устройств нет",L"No devices available"),12));
             }
             for(DWORD i=0;i<state.count[f];++i){
                 auto& row=rows[i];row.device=state.devices[f][i];
                 std::wstring display(row.device.alias[0]?row.device.alias:row.device.name);
                 row.label.Text(display);std::wstring tooltip=display;if(row.device.alias[0])tooltip+=L"\n"+std::wstring(row.device.name);
-                ctl::ToolTipService::SetToolTip(row.label,winrt::box_value(tooltip));ctl::ToolTipService::SetToolTip(row.checkbox,winrt::box_value(L"Показывать в панели: "+display));
-                xaml::Automation::AutomationProperties::SetName(row.checkbox,L"Показывать в панели: "+display);
+                ctl::ToolTipService::SetToolTip(row.label,winrt::box_value(tooltip));ctl::ToolTipService::SetToolTip(row.checkbox,winrt::box_value(qa::Text(L"Показывать в панели: ",L"Show in panel: ")+display));
+                xaml::Automation::AutomationProperties::SetName(row.checkbox,qa::Text(L"Показывать в панели: ",L"Show in panel: ")+display);
                 row.checkbox.IsChecked(winrt::box_value(row.device.hidden==0).as<wf::IReference<bool>>());row.checkbox.IsEnabled(!busy);row.save.IsEnabled(!busy);row.editor.IsEnabled(!busy);
                 // Older queued snapshots must not close a freshly opened editor.
                 if(row.pendingRename && state.completed>=row.pendingRename){
@@ -190,17 +190,17 @@ struct View:std::enable_shared_from_this<View>{
         xaml::Automation::AutomationProperties::SetAutomationId(panel,L"QuickAudioPanel");
         devicesPage=ctl::StackPanel();devicesPage.Spacing(6);content.Children().Append(devicesPage);
         for(int f=0;f<2;++f){
-            auto heading=Label(f?L"Микрофоны":L"Устройства вывода",14);
+            auto heading=Label(f?qa::Text(L"Микрофоны",L"Microphones"):qa::Text(L"Устройства вывода",L"Output devices"),14);
             heading.FontWeight({600});heading.Margin({0,f?6.0:0.0,0,2});devicesPage.Children().Append(heading);
             auto& section=sections[f];section.items=ctl::StackPanel();section.items.Spacing(2);
             section.scroll=ctl::ScrollViewer();section.scroll.HorizontalScrollBarVisibility(ctl::ScrollBarVisibility::Disabled);section.scroll.VerticalScrollBarVisibility(ctl::ScrollBarVisibility::Auto);
             section.scroll.Content(section.items);section.scroll.MaxHeight(f?92:138);
-            xaml::Automation::AutomationProperties::SetName(section.scroll,f?L"Выбор микрофона":L"Выбор устройства вывода звука");
+            xaml::Automation::AutomationProperties::SetName(section.scroll,f?qa::Text(L"Выбор микрофона",L"Microphone selection"):qa::Text(L"Выбор устройства вывода звука",L"Audio output selection"));
             devicesPage.Children().Append(section.scroll);
-            section.empty=Label(L"Доступных устройств нет",13);section.empty.Opacity(0.65);devicesPage.Children().Append(section.empty);
+            section.empty=Label(qa::Text(L"Доступных устройств нет",L"No devices available"),13);section.empty.Opacity(0.65);devicesPage.Children().Append(section.empty);
         }
-        sync=ctl::CheckBox();sync.Content(winrt::box_value(L"Также для звонков"));sync.FontSize(13);sync.MinHeight(32);
-        ctl::ToolTipService::SetToolTip(sync,winrt::box_value(L"При выборе менять также устройство связи, используемое приложениями для звонков."));
+        sync=ctl::CheckBox();sync.Content(winrt::box_value(qa::Text(L"Также для звонков",L"Also for calls")));sync.FontSize(13);sync.MinHeight(32);
+        ctl::ToolTipService::SetToolTip(sync,winrt::box_value(qa::Text(L"При выборе менять также устройство связи, используемое приложениями для звонков.",L"Also change the communications device used by calling apps.")));
         auto weak=weak_from_this();
         sync.Checked([weak](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())if(!self->updating)self->Request(2,1,L"");});
         sync.Unchecked([weak](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())if(!self->updating)self->Request(2,0,L"");});
@@ -208,13 +208,13 @@ struct View:std::enable_shared_from_this<View>{
         ctl::Grid indicator;indicator.Width(24);indicator.Height(32);ctl::Grid::SetColumn(indicator,1);options.Children().Append(indicator);
         progress=ctl::ProgressRing();progress.Width(18);progress.Height(18);progress.MinWidth(0);progress.MinHeight(0);
         progress.HorizontalAlignment(xaml::HorizontalAlignment::Center);progress.VerticalAlignment(xaml::VerticalAlignment::Center);
-        ctl::ToolTipService::SetToolTip(progress,winrt::box_value(L"Применяем выбор устройства"));indicator.Children().Append(progress);
+        ctl::ToolTipService::SetToolTip(progress,winrt::box_value(qa::Text(L"Применяем выбор устройства",L"Applying device selection")));indicator.Children().Append(progress);
         status=Label(L"\u26A0",15);status.HorizontalAlignment(xaml::HorizontalAlignment::Center);status.VerticalAlignment(xaml::VerticalAlignment::Center);
         status.Foreground(Brush({255,230,160,45}));indicator.Children().Append(status);
         settingsButton=ctl::Button();settingsButton.Width(28);settingsButton.Height(28);settingsButton.MinWidth(0);settingsButton.MinHeight(0);settingsButton.Padding({2,2,2,2});
         settingsButton.VerticalAlignment(xaml::VerticalAlignment::Center);ctl::Grid::SetColumn(settingsButton,2);options.Children().Append(settingsButton);
         ctl::FontIcon gear;gear.FontFamily(media::FontFamily(L"Segoe Fluent Icons"));gear.Glyph(L"\uE713");gear.FontSize(16);settingsButton.Content(gear);
-        ctl::ToolTipService::SetToolTip(settingsButton,winrt::box_value(L"Настройки аудиопанели"));xaml::Automation::AutomationProperties::SetName(settingsButton,L"Настройки аудиопанели");
+        ctl::ToolTipService::SetToolTip(settingsButton,winrt::box_value(qa::Text(L"Настройки аудиопанели",L"Audio panel settings")));xaml::Automation::AutomationProperties::SetName(settingsButton,qa::Text(L"Настройки аудиопанели",L"Audio panel settings"));
         BuildSettings();
         content.Children().Append(options);Feedback(false);
         ctl::Border divider;divider.Height(1);divider.Background(Brush({55,128,128,128}));divider.Margin({0,3,0,0});content.Children().Append(divider);
@@ -267,7 +267,7 @@ struct View:std::enable_shared_from_this<View>{
                 section.scroll.ChangeView(nullptr,winrt::box_value(offset).as<wf::IReference<double>>(),nullptr,true);
                 if(!focus.empty())for(auto& row:section.rows)if(focus==row.device.id)row.button.Focus(xaml::FocusState::Programmatic);
             }
-            section.empty.Text(state->count[f]?L"Все устройства скрыты — откройте настройки":L"Доступных устройств нет");section.empty.TextWrapping(xaml::TextWrapping::Wrap);
+            section.empty.Text(state->count[f]?qa::Text(L"Все устройства скрыты — откройте настройки",L"All devices are hidden — open settings"):qa::Text(L"Доступных устройств нет",L"No devices available"));section.empty.TextWrapping(xaml::TextWrapping::Wrap);
             section.empty.Visibility(visible.empty()?xaml::Visibility::Visible:xaml::Visibility::Collapsed);
             section.scroll.Visibility(visible.empty()?xaml::Visibility::Collapsed:xaml::Visibility::Visible);
             for(auto& row:section.rows){
@@ -277,7 +277,7 @@ struct View:std::enable_shared_from_this<View>{
                 row.check.Visibility(selected?xaml::Visibility::Visible:xaml::Visibility::Collapsed);
                 row.button.Background(Brush(selected?winrt::Windows::UI::Color{35,128,128,128}:winrt::Windows::UI::Color{0,0,0,0}));
                 row.button.IsEnabled(!busy);
-                std::wstring title(row.device.alias[0]?row.device.alias:row.device.name);if(row.device.alias[0])title+=L"\n"+std::wstring(row.device.name);if(selected)title+=L" — выбрано";if(calls)title+=L"; для звонков";
+                std::wstring title(row.device.alias[0]?row.device.alias:row.device.name);if(row.device.alias[0])title+=L"\n"+std::wstring(row.device.name);if(selected)title+=qa::Text(L" — выбрано",L" — selected");if(calls)title+=qa::Text(L"; для звонков",L"; for calls");
                 ctl::ToolTipService::SetToolTip(row.button,winrt::box_value(title));xaml::Automation::AutomationProperties::SetName(row.button,title);
             }
         }
@@ -368,3 +368,4 @@ struct Factory:winrt::implements<Factory,IClassFactory,winrt::non_agile>{
 STDAPI DllGetClassObject(REFCLSID cls,REFIID iid,void** p){if(cls!=qa::TapClsid)return CLASS_E_CLASSNOTAVAILABLE;try{return winrt::make<Factory>().as(iid,p);}catch(...){return winrt::to_hresult();}}
 STDAPI DllCanUnloadNow(){return S_FALSE;}
 BOOL WINAPI DllMain(HMODULE module,DWORD why,LPVOID){if(why==DLL_PROCESS_ATTACH){moduleHandle=module;DisableThreadLibraryCalls(module);}return TRUE;}
+

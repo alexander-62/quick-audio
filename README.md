@@ -24,7 +24,10 @@ Select a device with one click, hide unused devices, and give them names you rec
 
 Download `QuickAudio-Setup-0.2.0-x64.exe` from [Releases](https://github.com/alexander-62/quick-audio/releases).
 Run the installer and choose whether to start QuickAudio with Windows. Then press **Win + A**.
-The current release's interface is in Russian; the installer supports Russian and English.
+The 0.2.0 release's interface is in Russian; the installer supports Russian and English.
+The next build adds Russian and English throughout the panel, controls, and update messages.
+QuickAudio uses Russian for a Russian Windows display language and English otherwise.
+Restart QuickAudio after changing the Windows display language.
 
 Open **QuickAudio** from the Start menu to turn the panel on/off or change startup behavior.
 Turning the panel off for this session and disabling startup are independent controls.
@@ -104,7 +107,12 @@ Portable copies open the release page for a manual ZIP update instead.
 ## License and credits
 
 GPL-3.0-or-later. See [LICENSE](LICENSE) and [third-party notices](THIRD_PARTY_NOTICES.md).
+You may use, modify, and redistribute QuickAudio, including commercially.
+When distributing it or a modified version, provide the corresponding source code
+under GPL-3.0-or-later and preserve the license and attribution notices.
+The program is provided without warranty; the full license contains the binding terms.
 The XAML Diagnostics COM connection pattern is adapted from [m417z/UWPSpy](https://github.com/m417z/UWPSpy).
 The [Windows 11 Notification Center Styler](https://github.com/ramensoftware/windhawk-mods/blob/main/mods/windows-11-notification-center-styler.wh.cpp)
 and its [styling guide](https://github.com/ramensoftware/windows-11-notification-center-styling-guide)
 provided reference material for the system panel's native layout.
+

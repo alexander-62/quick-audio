@@ -70,3 +70,13 @@ interaction introduced in 0.1.1 still needs user visual confirmation.
 The update-window visual check and button-driven installer handoff have not yet
 been exercised through UI automation: access approval for QuickAudio timed out.
 The normal installer upgrade path was exercised independently and passed.
+
+## Russian and English interface
+
+On Windows with Russian and English display languages, restart QuickAudio and check
+the Win + A panel, device settings, accessibility names/tooltips, control window,
+and update success/error messages. Other display languages should fall back to English.
+Device names from Windows and user aliases must remain unchanged. Check long messages
+and labels at 100%, 150%, and 200% scaling, and recovery after the audio service reconnects.
+The existing 0.2.0 release binaries remain Russian-only.
+

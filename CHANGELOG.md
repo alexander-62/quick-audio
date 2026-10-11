@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Russian and English panel, controls, accessibility labels, and update messages.
+- Select Russian for a Russian Windows display language; fall back to English otherwise.
+- Explain the existing GPL-3.0-or-later redistribution terms in both READMEs.
+
 ## 0.2.0 — 2026-10-11
 
 - Manual update checking in controls and an entry point in the inline panel settings.
@@ -29,3 +35,4 @@ First public release.
 
 The earlier experimental builds numbered 1.0/1.2 were local prototypes,
 not public product releases. Product release numbering starts at 0.1.0.
+
