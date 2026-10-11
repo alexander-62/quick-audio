@@ -47,8 +47,12 @@ This releases Windows' DLL file lock for updates and clean uninstall.
 1. Run `scripts/set-version.ps1 -Version X.Y.Z` and update CHANGELOG.md.
 2. Build, run smoke checks, package, and complete Windows integration checks.
 3. Commit reviewed source and documentation; never commit user settings or logs.
-4. Ensure GitHub Actions passes and tag `vX.Y.Z`.
-5. Publish installer, portable ZIP, and SHA256SUMS.txt on that release.
+4. Add bilingual release notes at `docs/releases/X.Y.Z.md`.
+5. Push a release commit to `main` with a message beginning `Release `.
+   GitHub Actions builds, tests, and packages first. Its publication job creates
+   a draft release at the exact commit, uploads the installer, portable ZIP, and
+   SHA256SUMS.txt, verifies asset sizes and digests, then publishes it as latest.
+   Ordinary commits and pull requests only build; they do not publish releases.
 
 The manual updater in `src/updater.h` uses WinHTTP and Windows.Data.Json. It accepts
 stable numeric three-part tags only, matches the exact x64 installer asset and

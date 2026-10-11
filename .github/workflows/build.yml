@@ -30,3 +30,46 @@ jobs:
           name: QuickAudio-windows-x64
           path: dist/*
           if-no-files-found: error
+
+  publish:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release ')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/download-artifact@v4
+        with:
+          name: QuickAudio-windows-x64
+          path: dist
+      - name: Publish verified release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version=$(sed -n 's/^#define QA_VERSION "\([^"]*\)"/\1/p' src/version.h)
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          tag="v$version"
+          notes="docs/releases/$version.md"
+          test -f "$notes"
+          test -s "dist/QuickAudio-Setup-$version-x64.exe"
+          test -s "dist/QuickAudio-Portable-$version-x64.zip"
+          (cd dist && sha256sum --check SHA256SUMS.txt)
+          gh release create "$tag" --target "$GITHUB_SHA" --title "QuickAudio $version" --notes-file "$notes" --draft \
+            "dist/QuickAudio-Setup-$version-x64.exe" "dist/QuickAudio-Portable-$version-x64.zip" dist/SHA256SUMS.txt
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" > /tmp/quickaudio-release.json
+          python3 - <<'PY'
+          import hashlib, json, pathlib
+          release = json.loads(pathlib.Path('/tmp/quickaudio-release.json').read_text())
+          assert release['draft'], 'Release must remain a draft until verified'
+          assets = {a['name']: a for a in release['assets']}
+          files = list(pathlib.Path('dist').iterdir())
+          assert set(assets) == {p.name for p in files}, 'Unexpected release assets'
+          for path in files:
+              asset = assets[path.name]
+              assert asset['state'] == 'uploaded', path.name
+              assert asset['size'] == path.stat().st_size, path.name
+              assert asset['digest'] == 'sha256:' + hashlib.sha256(path.read_bytes()).hexdigest(), path.name
+          PY
+          gh release edit "$tag" --draft=false --latest

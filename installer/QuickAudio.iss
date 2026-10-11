@@ -1,4 +1,4 @@
-#define AppVersion "0.2.0"
+#define AppVersion "0.2.1"
 [Setup]
 AppId={{5F15B389-4D25-485F-9954-94B63C48626A}
 AppName=QuickAudio
@@ -47,6 +47,7 @@ Source: "..\build\QuickAudio.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\build\QuickAudio.Hook.{#AppVersion}.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\THIRD_PARTY_NOTICES.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\README.ru.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]

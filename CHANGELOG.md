@@ -1,10 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.2.1 — 2026-10-11
 
 - Russian and English panel, controls, accessibility labels, and update messages.
 - Select Russian for a Russian Windows display language; fall back to English otherwise.
 - Explain the existing GPL-3.0-or-later redistribution terms in both READMEs.
+- Include English and Russian documentation in installer and portable packages.
 
 ## 0.2.0 — 2026-10-11
 

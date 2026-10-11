@@ -22,10 +22,9 @@ Select a device with one click, hide unused devices, and give them names you rec
 
 ## Install
 
-Download `QuickAudio-Setup-0.2.0-x64.exe` from [Releases](https://github.com/alexander-62/quick-audio/releases).
+Download `QuickAudio-Setup-0.2.1-x64.exe` from [Releases](https://github.com/alexander-62/quick-audio/releases).
 Run the installer and choose whether to start QuickAudio with Windows. Then press **Win + A**.
-The 0.2.0 release's interface is in Russian; the installer supports Russian and English.
-The next build adds Russian and English throughout the panel, controls, and update messages.
+The panel, controls, update messages, and installer support Russian and English.
 QuickAudio uses Russian for a Russian Windows display language and English otherwise.
 Restart QuickAudio after changing the Windows display language.
 
@@ -33,11 +32,11 @@ Open **QuickAudio** from the Start menu to turn the panel on/off or change start
 Turning the panel off for this session and disabling startup are independent controls.
 
 The portable ZIP contains the same application: run `QuickAudio.exe` to open its controls,
-then click **Включить** (Enable). Keep the folder in a stable location if you enable startup.
+then click **Enable**. Keep the folder in a stable location if you enable startup.
 
 ## Device settings
 
-Use the small gear next to **Также для звонков** (Also for calls).
+Use the small gear next to **Also for calls**.
 The settings page stays inside the panel, with its own scrollbar and a Back button.
 
 - A checked device is visible in our selector; unchecking it does not disable its hardware.
@@ -56,7 +55,7 @@ Some apps apply the change only when a recording/playback session is restarted.
 - Tested on Windows 11 build **26300.9457**; other builds are not yet verified.
 - No separate Visual C++ Redistributable is required; the runtime is linked statically.
 
-This is an early **0.2.0** release. Windows does not offer a stable third-party extension API
+This is an early **0.2.1** release. Windows does not offer a stable third-party extension API
 for this panel. QuickAudio uses XAML Diagnostics and the undocumented PolicyConfig interface.
 Windows updates may require adaptations. Unsupported layouts are logged instead of patched blindly.
 Release binaries are currently unsigned.
@@ -93,12 +92,12 @@ See [development notes](docs/DEVELOPMENT.md) and [testing](docs/TESTING.md).
 
 ## Versioning
 
-Releases use `MAJOR.MINOR.PATCH`, currently **0.2.0**.
+Releases use `MAJOR.MINOR.PATCH`, currently **0.2.1**.
 User-facing version numbers and the internal IPC protocol version are separate.
 Use `scripts/set-version.ps1` when preparing a new release; see [CHANGELOG](CHANGELOG.md).
-Click **Проверить обновления** (Check for updates) in QuickAudio controls, or use the
+Click **Check for updates** in QuickAudio controls, or use the
 same button in the Win + A settings page. If a newer stable release exists, click
-**Установить X.Y.Z** (Install X.Y.Z). The installer is downloaded in the background,
+**Install X.Y.Z**. The installer is downloaded in the background,
 checked against the release asset's exact size and SHA-256, then opened as a normal
 installation wizard. Complete the wizard to update; preferences are preserved.
 No background polling, prerelease installation, or downgrade is performed.
