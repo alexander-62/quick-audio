@@ -71,7 +71,7 @@ struct Audio {
                     if(SUCCEEDED(props->GetValue(PKEY_Device_FriendlyName,&v)) && v.vt==VT_LPWSTR)Copy(item.name,v.pwszVal);PropVariantClear(&v);
                     if(SUCCEEDED(props->GetValue(PKEY_AudioEndpoint_FormFactor,&v)) && v.vt==VT_UI4)item.form=v.ulVal;PropVariantClear(&v);
                 }
-                if(!item.name[0])Copy(item.name,L"Аудиоустройство");
+                if(!item.name[0])Copy(item.name,qa::Text(L"Аудиоустройство",L"Audio device"));
                 item.hidden=GetPrivateProfileIntW(f?L"HiddenMicrophones":L"HiddenOutputs",item.id,0,SettingsFile().c_str())?1:0;
                 GetPrivateProfileStringW(f?L"MicrophoneNames":L"OutputNames",item.id,L"",item.alias,NameSize,SettingsFile().c_str());
                 devices.push_back(item);
@@ -167,12 +167,12 @@ int Run() {
                     Log(dir,(request.kind==6?L"RENAME":L"VISIBILITY")+std::wstring(L" flow=")+std::to_wstring(request.flow)+L" hidden="+std::to_wstring(request.kind==4)+L" id="+request.commandId+L" hr="+HresultText(hr));
                 }
                 current.completed=request.request;current.lastHresult=hr;
-                if(FAILED(hr))Copy(current.status,request.kind==1?L"Не удалось переключить устройство. Проверьте подключение и попробуйте снова.":L"Не удалось сохранить настройку. Попробуйте снова.");
+                if(FAILED(hr))Copy(current.status,request.kind==1?qa::Text(L"Не удалось переключить устройство. Проверьте подключение и попробуйте снова.",L"Could not switch devices. Check the connection and try again."):qa::Text(L"Не удалось сохранить настройку. Попробуйте снова.",L"Could not save the setting. Try again."));
             }
             auto hr=audio.Read(current);
             current.autostart=StartupEnabled()?1:0;
-            if(FAILED(hr)){current.lastHresult=hr;current.count[0]=current.count[1]=0;Copy(current.status,L"Аудиослужба недоступна. Повторяем подключение…");}
-            else if(wcsncmp(current.status,L"Аудиослужба",11)==0){current.status[0]=0;current.lastHresult=0;}
+            if(FAILED(hr)){current.lastHresult=hr;current.count[0]=current.count[1]=0;Copy(current.status,qa::Text(L"Аудиослужба недоступна. Повторяем подключение…",L"Audio service unavailable. Reconnecting…"));}
+            else if(wcscmp(current.status,qa::Text(L"Аудиослужба недоступна. Повторяем подключение…",L"Audio service unavailable. Reconnecting…"))==0){current.status[0]=0;current.lastHresult=0;}
             Publish(bus,current);
             HANDLE events[]{bus.stop,bus.command,refresh};auto reason=WaitForMultipleObjects(3,events,FALSE,5000);
             if(reason==WAIT_OBJECT_0+2){if(WaitForSingleObject(bus.stop,150)==WAIT_OBJECT_0)break;ResetEvent(refresh);}
@@ -205,3 +205,4 @@ int wmain(int argc,wchar_t** argv) {
     }
     if(action!=L"--run")return 2;CoInitializeEx(nullptr,COINIT_MULTITHREADED);auto result=Run();CoUninitialize();return result;
 }
+

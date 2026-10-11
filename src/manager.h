@@ -12,37 +12,37 @@ enum class UpdateStage { Idle,Checking,Available,Downloading,Ready,Launched,Erro
 struct UpdateUi {
     std::mutex mutex;std::atomic<bool> cancel{false};HWND window=nullptr;
     UpdateStage stage=UpdateStage::Idle;updates::Release release;
-    std::shared_ptr<updates::Installer> installer;std::wstring message=L"Проверка выполняется по нажатию кнопки.";
+    std::shared_ptr<updates::Installer> installer;std::wstring message=qa::Text(L"Проверка выполняется по нажатию кнопки.",L"Click the button to check for updates.");
     bool installed=updates::Installed();int percent=-1;
     void Notify(){if(!cancel)PostMessageW(window,UpdateChanged,0,0);}
     void Fail(std::wstring const& text){ {std::lock_guard<std::mutex> lock(mutex);stage=UpdateStage::Error;message=text;}Notify();}
 };
 inline void CheckUpdates(std::shared_ptr<UpdateUi> const& ui){
-    {std::lock_guard<std::mutex> lock(ui->mutex);ui->stage=UpdateStage::Checking;ui->message=L"Проверяем GitHub Releases…";ui->release={};ui->installer=nullptr;}
+    {std::lock_guard<std::mutex> lock(ui->mutex);ui->stage=UpdateStage::Checking;ui->message=qa::Text(L"Проверяем GitHub Releases…",L"Checking GitHub Releases…");ui->release={};ui->installer=nullptr;}
     ui->Notify();std::thread([ui]{
         CoInitializeEx(nullptr,COINIT_MULTITHREADED);
         try{
             auto release=updates::Latest(ui->cancel);bool newer=updates::IsNewer(release.version,QA_VERSION_W);
             {std::lock_guard<std::mutex> lock(ui->mutex);ui->release=std::move(release);ui->stage=newer?UpdateStage::Available:UpdateStage::Idle;
-                ui->message=newer?L"Доступна версия "+ui->release.version+(ui->installed?L". Можно установить обновление.":L". Для portable скачайте ZIP из выпуска."):L"Установлена актуальная версия " QA_VERSION_W L".";}
+                ui->message=newer?qa::Text(L"Доступна версия ",L"Version available: ")+ui->release.version+(ui->installed?qa::Text(L". Можно установить обновление.",L". You can install the update."):qa::Text(L". Для portable скачайте ZIP из выпуска.",L". For portable, download the release ZIP.")):std::wstring(qa::Text(L"Установлена актуальная версия ",L"You have the latest version: "))+QA_VERSION_W+L".";}
             ui->Notify();
-        }catch(updates::Error const& e){ui->Fail(e.message);}catch(...){ui->Fail(L"Не удалось прочитать сведения о выпуске. Повторите позже.");}
+        }catch(updates::Error const& e){ui->Fail(e.message);}catch(...){ui->Fail(qa::Text(L"Не удалось прочитать сведения о выпуске. Повторите позже.",L"Could not read release details. Try again later."));}
         CoUninitialize();
     }).detach();
 }
 inline void DownloadUpdate(std::shared_ptr<UpdateUi> const& ui){
     updates::Release release;
-    {std::lock_guard<std::mutex> lock(ui->mutex);release=ui->release;ui->stage=UpdateStage::Downloading;ui->percent=-1;ui->message=L"Загружаем установщик…";}
+    {std::lock_guard<std::mutex> lock(ui->mutex);release=ui->release;ui->stage=UpdateStage::Downloading;ui->percent=-1;ui->message=qa::Text(L"Загружаем установщик…",L"Downloading installer…");}
     ui->Notify();std::thread([ui,release]{
         CoInitializeEx(nullptr,COINIT_MULTITHREADED);
         try{
             auto installer=updates::Download(release,ui->cancel,[ui,release](size_t size){
                 int percent=static_cast<int>(size*100/release.size);bool changed=false;
-                {std::lock_guard<std::mutex> lock(ui->mutex);if(percent!=ui->percent){ui->percent=percent;ui->message=L"Загрузка: "+std::to_wstring(percent)+L"%. Проверяем SHA-256…";changed=true;}}
+                {std::lock_guard<std::mutex> lock(ui->mutex);if(percent!=ui->percent){ui->percent=percent;ui->message=qa::Text(L"Загрузка: ",L"Download: ")+std::to_wstring(percent)+qa::Text(L"%. Проверяем SHA-256…",L"%. Verifying SHA-256…");changed=true;}}
                 if(changed)ui->Notify();
             });
-            {std::lock_guard<std::mutex> lock(ui->mutex);ui->installer=std::move(installer);ui->stage=UpdateStage::Ready;ui->message=L"Установщик проверен. Открываем…";}ui->Notify();
-        }catch(updates::Error const& e){ui->Fail(e.message);}catch(...){ui->Fail(L"Не удалось загрузить обновление. Повторите позже.");}
+            {std::lock_guard<std::mutex> lock(ui->mutex);ui->installer=std::move(installer);ui->stage=UpdateStage::Ready;ui->message=qa::Text(L"Установщик проверен. Открываем…",L"Installer verified. Opening…");}ui->Notify();
+        }catch(updates::Error const& e){ui->Fail(e.message);}catch(...){ui->Fail(qa::Text(L"Не удалось загрузить обновление. Повторите позже.",L"Could not download the update. Try again later."));}
         CoUninitialize();
     }).detach();
 }
@@ -97,17 +97,17 @@ inline LRESULT CALLBACK ManagerProc(HWND window,UINT message,WPARAM wp,LPARAM lp
     case WM_CREATE:{
         font=CreateFontW(-MulDiv(16,GetDpiForWindow(window),96),0,0,0,FW_NORMAL,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,DEFAULT_PITCH,L"Segoe UI");
         Child(window,L"STATIC",L"QuickAudio " QA_VERSION_W,0,20,16,350,24,0,font);
-        Child(window,L"STATIC",L"Выход звука и микрофон прямо в Win + A",0,20,48,350,24,0,font);
+        Child(window,L"STATIC",qa::Text(L"Выход звука и микрофон прямо в Win + A",L"Audio output and microphone in Win + A"),0,20,48,350,24,0,font);
         status=Child(window,L"STATIC",L"",0,20,82,350,24,0,font);
-        start=Child(window,L"BUTTON",L"Включить",WS_TABSTOP|BS_PUSHBUTTON,20,116,158,32,101,font);
-        stop=Child(window,L"BUTTON",L"Выключить",WS_TABSTOP|BS_PUSHBUTTON,190,116,158,32,102,font);
-        startup=Child(window,L"BUTTON",L"Запускать вместе с Windows",WS_TABSTOP|BS_AUTOCHECKBOX,20,166,340,28,103,font);
-        Child(window,L"BUTTON",L"Папка настроек",WS_TABSTOP|BS_PUSHBUTTON,20,208,158,32,104,font);
+        start=Child(window,L"BUTTON",qa::Text(L"Включить",L"Enable"),WS_TABSTOP|BS_PUSHBUTTON,20,116,158,32,101,font);
+        stop=Child(window,L"BUTTON",qa::Text(L"Выключить",L"Disable"),WS_TABSTOP|BS_PUSHBUTTON,190,116,158,32,102,font);
+        startup=Child(window,L"BUTTON",qa::Text(L"Запускать вместе с Windows",L"Start with Windows"),WS_TABSTOP|BS_AUTOCHECKBOX,20,166,340,28,103,font);
+        Child(window,L"BUTTON",qa::Text(L"Папка настроек",L"Settings folder"),WS_TABSTOP|BS_PUSHBUTTON,20,208,158,32,104,font);
         Child(window,L"BUTTON",L"GitHub",WS_TABSTOP|BS_PUSHBUTTON,190,208,158,32,105,font);
-        Child(window,L"STATIC",L"Обновления",0,20,258,328,24,0,font);
-        updateStatus=Child(window,L"STATIC",L"Проверка выполняется по нажатию кнопки.",0,20,288,328,46,0,font);
-        updateButton=Child(window,L"BUTTON",L"Проверить обновления",WS_TABSTOP|BS_PUSHBUTTON,20,342,328,34,106,font);
-        Child(window,L"BUTTON",L"Что нового в последнем выпуске",WS_TABSTOP|BS_PUSHBUTTON,20,386,328,30,107,font);
+        Child(window,L"STATIC",qa::Text(L"Обновления",L"Updates"),0,20,258,328,24,0,font);
+        updateStatus=Child(window,L"STATIC",qa::Text(L"Проверка выполняется по нажатию кнопки.",L"Click the button to check for updates."),0,20,288,328,46,0,font);
+        updateButton=Child(window,L"BUTTON",qa::Text(L"Проверить обновления",L"Check for updates"),WS_TABSTOP|BS_PUSHBUTTON,20,342,328,34,106,font);
+        Child(window,L"BUTTON",qa::Text(L"Что нового в последнем выпуске",L"Latest release notes"),WS_TABSTOP|BS_PUSHBUTTON,20,386,328,30,107,font);
         update=std::make_shared<UpdateUi>();update->window=window;
         SetTimer(window,1,1000,nullptr);SendMessageW(window,WM_TIMER,1,0);return 0;}
     case OpenUpdates:{SetFocus(updateButton);UpdateStage stage;{std::lock_guard<std::mutex> lock(update->mutex);stage=update->stage;}if(stage==UpdateStage::Idle || stage==UpdateStage::Error)CheckUpdates(update);return 0;}
@@ -116,21 +116,21 @@ inline LRESULT CALLBACK ManagerProc(HWND window,UINT message,WPARAM wp,LPARAM lp
         {std::lock_guard<std::mutex> lock(update->mutex);
             SetWindowTextW(updateStatus,update->message.c_str());
             bool available=!update->release.version.empty() && updates::IsNewer(update->release.version,QA_VERSION_W);
-            std::wstring button=available?(update->installed?L"Установить ":L"Открыть выпуск ")+update->release.version:L"Проверить обновления";
+            std::wstring button=available?(update->installed?qa::Text(L"Установить ",L"Install "):qa::Text(L"Открыть выпуск ",L"Open release "))+update->release.version:qa::Text(L"Проверить обновления",L"Check for updates");
             SetWindowTextW(updateButton,button.c_str());bool busy=update->stage==UpdateStage::Checking || update->stage==UpdateStage::Downloading || update->stage==UpdateStage::Ready || update->stage==UpdateStage::Launched;EnableWindow(updateButton,!busy);
             if(update->stage==UpdateStage::Ready){installer=update->installer;release=update->release;update->stage=UpdateStage::Launched;}
         }
         if(installer)try{
             installer->Verify(release);SHELLEXECUTEINFOW execute{sizeof(execute)};execute.fMask=SEE_MASK_NOCLOSEPROCESS|SEE_MASK_FLAG_NO_UI;execute.hwnd=window;execute.lpVerb=L"open";execute.lpFile=installer->path.c_str();execute.nShow=SW_SHOWNORMAL;
-            updates::Require(ShellExecuteExW(&execute)!=0,L"Не удалось открыть установщик. Повторите загрузку.");installer->keep=true;
-            {std::lock_guard<std::mutex> lock(update->mutex);update->message=L"Установщик открыт. Завершите обновление в нём.";}update->Notify();
+            updates::Require(ShellExecuteExW(&execute)!=0,qa::Text(L"Не удалось открыть установщик. Повторите загрузку.",L"Could not open the installer. Download it again."));installer->keep=true;
+            {std::lock_guard<std::mutex> lock(update->mutex);update->message=qa::Text(L"Установщик открыт. Завершите обновление в нём.",L"Installer opened. Complete the update there.");}update->Notify();
             if(execute.hProcess)std::thread([ui=update,process=execute.hProcess]{
                 while(!ui->cancel && WaitForSingleObject(process,250)==WAIT_TIMEOUT){}
-                CloseHandle(process);if(!ui->cancel){ {std::lock_guard<std::mutex> lock(ui->mutex);ui->stage=UpdateStage::Idle;ui->release={};ui->message=L"Установщик закрыт. Можно повторить проверку.";}ui->Notify();}
+                CloseHandle(process);if(!ui->cancel){ {std::lock_guard<std::mutex> lock(ui->mutex);ui->stage=UpdateStage::Idle;ui->release={};ui->message=qa::Text(L"Установщик закрыт. Можно повторить проверку.",L"Installer closed. You can check again.");}ui->Notify();}
             }).detach();
-        }catch(updates::Error const& e){update->Fail(e.message);}catch(...){update->Fail(L"Не удалось запустить обновление. Повторите позже.");}
+        }catch(updates::Error const& e){update->Fail(e.message);}catch(...){update->Fail(qa::Text(L"Не удалось запустить обновление. Повторите позже.",L"Could not start the update. Try again later."));}
         return 0;}
-    case WM_TIMER:{bool running=AgentRunning();SetWindowTextW(status,running?L"Панель включена — откройте Win + A":L"Панель выключена");EnableWindow(start,!running);EnableWindow(stop,running);SendMessageW(startup,BM_SETCHECK,StartupEnabled()?BST_CHECKED:BST_UNCHECKED,0);return 0;}
+    case WM_TIMER:{bool running=AgentRunning();SetWindowTextW(status,running?qa::Text(L"Панель включена — откройте Win + A",L"Panel enabled — open Win + A"):qa::Text(L"Панель выключена",L"Panel disabled"));EnableWindow(start,!running);EnableWindow(stop,running);SendMessageW(startup,BM_SETCHECK,StartupEnabled()?BST_CHECKED:BST_UNCHECKED,0);return 0;}
     case WM_COMMAND:{auto id=LOWORD(wp);bool ok=true;
         if(id==101)ok=LaunchAgent();else if(id==102)ok=StopAgent()==0;
         else if(id==103)ok=SetStartup(SendMessageW(startup,BM_GETCHECK,0,0)==BST_CHECKED,ExePath())==ERROR_SUCCESS;
@@ -146,7 +146,7 @@ inline LRESULT CALLBACK ManagerProc(HWND window,UINT message,WPARAM wp,LPARAM lp
             }
         }
         else if(id==107)ShellExecuteW(window,L"open",updates::ReleasePage,nullptr,nullptr,SW_SHOWNORMAL);
-        if(!ok)MessageBoxW(window,L"Не удалось применить настройку. Проверьте журнал в папке настроек.",L"QuickAudio",MB_OK|MB_ICONERROR);
+        if(!ok)MessageBoxW(window,qa::Text(L"Не удалось применить настройку. Проверьте журнал в папке настроек.",L"Could not apply the setting. Check the log in the settings folder."),L"QuickAudio",MB_OK|MB_ICONERROR);
         SendMessageW(window,WM_TIMER,1,0);return 0;}
     case WM_DESTROY:if(update)update->cancel=true;KillTimer(window,1);if(font)DeleteObject(font);PostQuitMessage(0);return 0;
     }return DefWindowProcW(window,message,wp,lp);
@@ -156,7 +156,8 @@ inline int ShowManager(HINSTANCE instance,bool checkUpdates=false){
     INITCOMMONCONTROLSEX common{sizeof(common),ICC_STANDARD_CLASSES};InitCommonControlsEx(&common);
     WNDCLASSW klass{};klass.hInstance=instance;klass.lpszClassName=name;klass.lpfnWndProc=ManagerProc;klass.hCursor=LoadCursorW(nullptr,MAKEINTRESOURCEW(32512));klass.hIcon=LoadIconW(instance,MAKEINTRESOURCEW(1));klass.hbrBackground=reinterpret_cast<HBRUSH>(COLOR_WINDOW+1);RegisterClassW(&klass);
     UINT dpi=GetDpiForSystem();RECT rect{0,0,MulDiv(374,dpi,96),MulDiv(438,dpi,96)};AdjustWindowRectExForDpi(&rect,WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX,FALSE,0,dpi);
-    auto window=CreateWindowExW(0,name,L"QuickAudio — настройки",WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX,CW_USEDEFAULT,CW_USEDEFAULT,rect.right-rect.left,rect.bottom-rect.top,nullptr,nullptr,instance,nullptr);if(!window)return 1;
+    auto window=CreateWindowExW(0,name,qa::Text(L"QuickAudio — настройки",L"QuickAudio — Settings"),WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX,CW_USEDEFAULT,CW_USEDEFAULT,rect.right-rect.left,rect.bottom-rect.top,nullptr,nullptr,instance,nullptr);if(!window)return 1;
     ShowWindow(window,SW_SHOWNORMAL);if(checkUpdates)PostMessageW(window,OpenUpdates,0,0);MSG message;while(GetMessageW(&message,nullptr,0,0)>0){if(!IsDialogMessageW(window,&message)){TranslateMessage(&message);DispatchMessageW(&message);}}return 0;
 }
 }
+
