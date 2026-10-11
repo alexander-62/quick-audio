@@ -1,0 +1,9 @@
+@echo off
+setlocal
+cd /d "%~dp0.."
+if not defined VSCMD_VER (
+  for /f "usebackq tokens=*" %%I in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "QA_VS=%%I"
+)
+if not defined VSCMD_VER if not defined QA_VS exit /b 1
+if not defined VSCMD_VER call "%QA_VS%\VC\Auxiliary\Build\vcvars64.bat"
+cl /nologo /std:c++17 /EHsc /utf-8 /MT tests\integration.cpp /Fo:build\integration.obj /Fe:build\integration.exe /link advapi32.lib shell32.lib ole32.lib uuid.lib

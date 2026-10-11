@@ -1,0 +1,26 @@
+name: Build Windows x64
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Compile native binaries
+        shell: cmd
+        run: scripts\build.cmd
+      - name: Verify version metadata
+        shell: pwsh
+        run: ./tests/smoke.ps1
+      - name: Build installer and portable package
+        shell: pwsh
+        run: ./scripts/package.ps1
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: QuickAudio-windows-x64
+          path: dist/*
+          if-no-files-found: error

@@ -1,0 +1,14 @@
+/build/
+/dist/
+*.obj
+*.res
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.dll
+*.exe
+*.log
+settings.ini
+.vs/
+

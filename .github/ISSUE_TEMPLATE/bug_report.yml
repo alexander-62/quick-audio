@@ -1,0 +1,28 @@
+name: Bug report
+description: Report a QuickAudio problem
+body:
+  - type: input
+    id: version
+    attributes:
+      label: QuickAudio version
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows build and display scale
+      placeholder: Windows 11, build number from winver, 125%
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: What happened and how to reproduce it
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log excerpt (optional)
+      description: Review and redact personal device names or endpoint IDs before posting.
