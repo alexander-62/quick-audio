@@ -1,4 +1,4 @@
-#define AppVersion "0.1.0"
+#define AppVersion "0.1.1"
 [Setup]
 AppId={{5F15B389-4D25-485F-9954-94B63C48626A}
 AppName=QuickAudio

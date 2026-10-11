@@ -65,10 +65,10 @@ struct Bus {
     bool Lock(DWORD ms=1000) {auto r=WaitForSingleObject(mutex,ms);return r==WAIT_OBJECT_0 || r==WAIT_ABANDONED;}
     void Unlock() {ReleaseMutex(mutex);}
     bool Snapshot(State& out) {if(!Lock())return false;out=*state;Unlock();return out.magic==Magic && out.version==Version;}
-    bool Send(DWORD kind,DWORD flow,std::wstring const& id,std::wstring const& name=L"") {
+    bool Send(DWORD kind,DWORD flow,std::wstring const& id,std::wstring const& name=L"",unsigned long long* requestNumber=nullptr) {
         if(!Lock(0))return false;
         bool ok=state->magic==Magic && !state->stopping && state->request==state->completed;
-        if(ok){state->kind=kind;state->flow=flow;Copy(state->commandId,id);Copy(state->commandName,name);++state->request;}
+        if(ok){state->kind=kind;state->flow=flow;Copy(state->commandId,id);Copy(state->commandName,name);++state->request;if(requestNumber)*requestNumber=state->request;}
         Unlock(); if(ok)SetEvent(command);return ok;
     }
 };

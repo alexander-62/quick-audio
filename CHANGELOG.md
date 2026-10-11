@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1 — 2026-10-11
+
+- Compact, single-line device settings: visibility checkbox, display name, and pencil button.
+- Rename in place; the pencil becomes a save checkmark. Enter saves and Esc cancels.
+- Keep the row height unchanged while editing and retain input when saving fails.
+- Use C++20 for compatibility with current MSVC and isolate portable packages by version.
+
 ## 0.1.0 — 2026-10-11
 
 First public release.

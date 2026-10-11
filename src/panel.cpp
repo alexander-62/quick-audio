@@ -43,7 +43,12 @@ void Column(ctl::Grid const& grid,double size,bool star=false){ctl::ColumnDefini
 ctl::TextBlock Label(std::wstring const& s,double size=14){ctl::TextBlock t;t.Text(s);t.FontSize(size);return t;}
 struct Row {qa::Device device{};ctl::Button button{nullptr};ctl::Border stripe{nullptr};ctl::FontIcon check{nullptr};ctl::TextBlock text{nullptr};};
 struct Section {ctl::StackPanel items{nullptr};ctl::ScrollViewer scroll{nullptr};ctl::TextBlock empty{nullptr};std::vector<Row> rows;};
-struct SettingRow {qa::Device device{};ctl::CheckBox checkbox{nullptr};ctl::TextBox editor{nullptr};ctl::Button save{nullptr};};
+struct SettingRow {
+    qa::Device device{};
+    ctl::CheckBox checkbox{nullptr};ctl::TextBlock label{nullptr};
+    ctl::TextBox editor{nullptr};ctl::Button save{nullptr};ctl::FontIcon actionIcon{nullptr};
+    bool editing=false;unsigned long long pendingRename=0;
+};
 struct View:std::enable_shared_from_this<View>{
     winrt::weak_ref<ctl::Grid> parent;
     ctl::Border panel{nullptr};ctl::StackPanel content{nullptr},devicesPage{nullptr},settingsPage{nullptr};
@@ -62,10 +67,40 @@ struct View:std::enable_shared_from_this<View>{
         status.Visibility(error.empty()?xaml::Visibility::Collapsed:xaml::Visibility::Visible);
         if(!error.empty()){ctl::ToolTipService::SetToolTip(status,winrt::box_value(error));xaml::Automation::AutomationProperties::SetName(status,error);}
     }
-    void Request(DWORD kind,DWORD flow,std::wstring const& id,std::wstring const& name=L""){
+    bool Request(DWORD kind,DWORD flow,std::wstring const& id,std::wstring const& name=L"",unsigned long long* requestNumber=nullptr){
         auto bus=std::atomic_load(&sharedBus);
-        if(bus && bus->Send(kind,flow,id,name)){Feedback(true);for(auto& group:settingRows)for(auto& row:group){row.checkbox.IsEnabled(false);row.save.IsEnabled(false);}Log(L"UI_REQUEST kind="+std::to_wstring(kind)+L" flow="+std::to_wstring(flow)+L" id="+id+L" panelHeight="+std::to_wstring(panel.ActualHeight()));}
-        else{Feedback(false,L"Подождите завершения переключения и попробуйте снова.");}
+        if(bus && bus->Send(kind,flow,id,name,requestNumber)){
+            Feedback(true);for(auto& group:settingRows)for(auto& row:group){row.checkbox.IsEnabled(false);row.save.IsEnabled(false);row.editor.IsEnabled(false);}
+            Log(L"UI_REQUEST kind="+std::to_wstring(kind)+L" flow="+std::to_wstring(flow)+L" id="+id+L" panelHeight="+std::to_wstring(panel.ActualHeight()));return true;
+        }
+        Feedback(false,L"Подождите завершения переключения и попробуйте снова.");return false;
+    }
+    void SetEditing(SettingRow& row,bool editing,bool focus=false){
+        row.editing=editing;
+        row.label.Visibility(editing?xaml::Visibility::Collapsed:xaml::Visibility::Visible);
+        row.editor.Visibility(editing?xaml::Visibility::Visible:xaml::Visibility::Collapsed);
+        row.actionIcon.Glyph(editing?L"\uE73E":L"\uE70F");
+        std::wstring action=editing?L"Сохранить название":L"Переименовать устройство";
+        ctl::ToolTipService::SetToolTip(row.save,winrt::box_value(action));
+        xaml::Automation::AutomationProperties::SetName(row.save,action+L": "+std::wstring(row.device.name));
+        if(editing){
+            row.editor.Text(row.device.alias[0]?row.device.alias:row.device.name);
+            if(focus){row.editor.Focus(xaml::FocusState::Programmatic);row.editor.SelectAll();}
+        }else if(focus)row.save.Focus(xaml::FocusState::Programmatic);
+    }
+    void RenameAction(DWORD flow,std::wstring const& id){
+        for(auto& row:settingRows[flow])if(id==row.device.id){
+            if(!row.save.IsEnabled() || row.pendingRename)return;
+            if(row.editing){Request(6,flow,id,std::wstring(row.editor.Text()),&row.pendingRename);}
+            else{
+                for(auto& group:settingRows)for(auto& other:group)if(other.editing && !other.pendingRename)SetEditing(other,false);
+                SetEditing(row,true,true);
+            }
+            return;
+        }
+    }
+    void CancelRename(DWORD flow,std::wstring const& id){
+        for(auto& row:settingRows[flow])if(id==row.device.id && row.editing && !row.pendingRename){SetEditing(row,false,true);return;}
     }
     void ShowSettings(bool show){
         if(show){
@@ -77,6 +112,7 @@ struct View:std::enable_shared_from_this<View>{
                 settingsScroll.MaxHeight(std::clamp(available-native-130,96.0,240.0));
             }
         }
+        if(!show)for(auto& group:settingRows)for(auto& row:group)if(row.editing && !row.pendingRename)SetEditing(row,false);
         settingsOpen=show;devicesPage.Visibility(show?xaml::Visibility::Collapsed:xaml::Visibility::Visible);settingsPage.Visibility(show?xaml::Visibility::Visible:xaml::Visibility::Collapsed);
         Log(show?L"SETTINGS_OPEN inline=1":L"SETTINGS_CLOSE");
     }
@@ -90,8 +126,8 @@ struct View:std::enable_shared_from_this<View>{
         startup=ctl::CheckBox();startup.Content(winrt::box_value(L"Запускать вместе с Windows"));startup.FontSize(13);groups.Children().Append(startup);
         startup.Checked([weak](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())if(!self->updatingSettings)self->Request(7,1,L"");});
         startup.Unchecked([weak](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())if(!self->updatingSettings)self->Request(7,0,L"");});
-        auto hint=Label(L"Флажок показывает устройство в панели. Введите своё название и нажмите \u2713 или Enter. Пустое поле вернёт исходное имя.",12);hint.TextWrapping(xaml::TextWrapping::Wrap);hint.Opacity(0.75);groups.Children().Append(hint);
-        for(int f=0;f<2;++f){auto header=Label(f?L"Микрофоны":L"Устройства вывода",13);header.FontWeight({600});header.Margin({0,8,0,0});groups.Children().Append(header);settingsItems[f]=ctl::StackPanel();settingsItems[f].Spacing(10);groups.Children().Append(settingsItems[f]);}
+        auto hint=Label(L"Флажок показывает устройство. Карандаш — переименовать, \u2713 или Enter — сохранить, Esc — отменить. Пустое имя вернёт исходное.",12);hint.TextWrapping(xaml::TextWrapping::Wrap);hint.Opacity(0.75);groups.Children().Append(hint);
+        for(int f=0;f<2;++f){auto header=Label(f?L"Микрофоны":L"Устройства вывода",13);header.FontWeight({600});header.Margin({0,8,0,0});groups.Children().Append(header);settingsItems[f]=ctl::StackPanel();settingsItems[f].Spacing(4);groups.Children().Append(settingsItems[f]);}
         settingsButton.Click([weak](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())self->ShowSettings(!self->settingsOpen);});
     }
     void UpdateSettings(qa::State const& state,bool busy){
@@ -101,26 +137,42 @@ struct View:std::enable_shared_from_this<View>{
             if(!rebuild)for(DWORD i=0;i<state.count[f];++i)if(wcscmp(rows[i].device.id,state.devices[f][i].id) || wcscmp(rows[i].device.name,state.devices[f][i].name)){rebuild=true;break;}
             if(rebuild){settingsItems[f].Children().Clear();rows.clear();
                 for(DWORD i=0;i<state.count[f];++i){
-                    SettingRow row;row.device=state.devices[f][i];ctl::StackPanel entry;entry.Spacing(4);row.checkbox=ctl::CheckBox();row.checkbox.MinHeight(32);row.checkbox.HorizontalAlignment(xaml::HorizontalAlignment::Stretch);
-                    auto text=Label(row.device.name,13);text.TextWrapping(xaml::TextWrapping::Wrap);row.checkbox.Content(text);
-                    ctl::ToolTipService::SetToolTip(row.checkbox,winrt::box_value(std::wstring(row.device.name)));
-                    xaml::Automation::AutomationProperties::SetName(row.checkbox,row.device.name);
+                    SettingRow row;row.device=state.devices[f][i];
+                    ctl::Grid entry;entry.Height(36);Column(entry,28);Column(entry,1,true);Column(entry,36);
+                    row.checkbox=ctl::CheckBox();row.checkbox.MinHeight(0);row.checkbox.MinWidth(0);row.checkbox.Width(24);row.checkbox.Height(32);row.checkbox.VerticalAlignment(xaml::VerticalAlignment::Center);entry.Children().Append(row.checkbox);
+                    row.label=Label(row.device.name,13);row.label.TextWrapping(xaml::TextWrapping::NoWrap);row.label.TextTrimming(xaml::TextTrimming::CharacterEllipsis);row.label.VerticalAlignment(xaml::VerticalAlignment::Center);row.label.Margin({0,0,6,0});ctl::Grid::SetColumn(row.label,1);entry.Children().Append(row.label);
                     std::wstring id(row.device.id);
                     row.checkbox.Checked([weak,id,f](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())if(!self->updatingSettings)self->Request(5,f,id);});
                     row.checkbox.Unchecked([weak,id,f](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())if(!self->updatingSettings)self->Request(4,f,id);});
-                    entry.Children().Append(row.checkbox);ctl::Grid edit;Column(edit,1,true);Column(edit,36);
-                    row.editor=ctl::TextBox();row.editor.FontSize(13);row.editor.MaxLength(255);row.editor.Text(row.device.alias);row.editor.PlaceholderText(row.device.name);row.editor.IsSpellCheckEnabled(false);edit.Children().Append(row.editor);
+                    row.editor=ctl::TextBox();row.editor.FontSize(13);row.editor.MaxLength(255);row.editor.Height(32);row.editor.MinHeight(0);row.editor.Padding({6,4,6,4});row.editor.VerticalAlignment(xaml::VerticalAlignment::Center);row.editor.Margin({0,0,4,0});row.editor.PlaceholderText(row.device.name);row.editor.IsSpellCheckEnabled(false);row.editor.AcceptsReturn(false);row.editor.TextWrapping(xaml::TextWrapping::NoWrap);ctl::Grid::SetColumn(row.editor,1);entry.Children().Append(row.editor);
                     xaml::Automation::AutomationProperties::SetName(row.editor,L"Название в панели: "+std::wstring(row.device.name));
-                    row.save=ctl::Button();row.save.Content(winrt::box_value(L"\u2713"));row.save.MinWidth(0);row.save.Padding({0,0,0,0});row.save.Width(32);ctl::Grid::SetColumn(row.save,1);edit.Children().Append(row.save);
-                    ctl::ToolTipService::SetToolTip(row.save,winrt::box_value(L"Сохранить название"));xaml::Automation::AutomationProperties::SetName(row.save,L"Сохранить название");
-                    auto editor=winrt::make_weak(row.editor);
-                    row.save.Click([weak,editor,id,f](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())if(auto box=editor.get())self->Request(6,f,id,std::wstring(box.Text()));});
-                    row.editor.KeyDown([weak,id,f](wf::IInspectable const& sender,xaml::Input::KeyRoutedEventArgs const& args){if(args.Key()==winrt::Windows::System::VirtualKey::Enter){args.Handled(true);if(auto self=weak.lock())self->Request(6,f,id,std::wstring(sender.as<ctl::TextBox>().Text()));}});
-                    entry.Children().Append(edit);settingsItems[f].Children().Append(entry);rows.push_back(std::move(row));
+                    row.save=ctl::Button();row.save.MinWidth(0);row.save.MinHeight(0);row.save.Padding({0,0,0,0});row.save.Width(32);row.save.Height(32);row.save.VerticalAlignment(xaml::VerticalAlignment::Center);ctl::Grid::SetColumn(row.save,2);entry.Children().Append(row.save);
+                    row.actionIcon=ctl::FontIcon();row.actionIcon.FontFamily(media::FontFamily(L"Segoe Fluent Icons"));row.actionIcon.FontSize(14);row.save.Content(row.actionIcon);SetEditing(row,false);
+                    row.save.Click([weak,id,f](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())self->RenameAction(f,id);});
+                    row.editor.KeyDown([weak,id,f](wf::IInspectable const&,xaml::Input::KeyRoutedEventArgs const& args){
+                        if(args.Key()==winrt::Windows::System::VirtualKey::Enter){args.Handled(true);if(auto self=weak.lock())self->RenameAction(f,id);}
+                        else if(args.Key()==winrt::Windows::System::VirtualKey::Escape){args.Handled(true);if(auto self=weak.lock())self->CancelRename(f,id);}
+                    });
+                    settingsItems[f].Children().Append(entry);rows.push_back(std::move(row));
                 }
                 if(rows.empty())settingsItems[f].Children().Append(Label(L"Доступных устройств нет",12));
             }
-            for(DWORD i=0;i<state.count[f];++i){if(wcscmp(rows[i].device.alias,state.devices[f][i].alias))rows[i].editor.Text(state.devices[f][i].alias);rows[i].device=state.devices[f][i];rows[i].checkbox.IsChecked(winrt::box_value(state.devices[f][i].hidden==0).as<wf::IReference<bool>>());rows[i].checkbox.IsEnabled(!busy);rows[i].save.IsEnabled(!busy);rows[i].editor.IsEnabled(!busy);}
+            for(DWORD i=0;i<state.count[f];++i){
+                auto& row=rows[i];row.device=state.devices[f][i];
+                std::wstring display(row.device.alias[0]?row.device.alias:row.device.name);
+                row.label.Text(display);std::wstring tooltip=display;if(row.device.alias[0])tooltip+=L"\n"+std::wstring(row.device.name);
+                ctl::ToolTipService::SetToolTip(row.label,winrt::box_value(tooltip));ctl::ToolTipService::SetToolTip(row.checkbox,winrt::box_value(L"Показывать в панели: "+display));
+                xaml::Automation::AutomationProperties::SetName(row.checkbox,L"Показывать в панели: "+display);
+                row.checkbox.IsChecked(winrt::box_value(row.device.hidden==0).as<wf::IReference<bool>>());row.checkbox.IsEnabled(!busy);row.save.IsEnabled(!busy);row.editor.IsEnabled(!busy);
+                // Older queued snapshots must not close a freshly opened editor.
+                if(row.pendingRename && state.completed>=row.pendingRename){
+                    row.pendingRename=0;
+                    if(SUCCEEDED(static_cast<HRESULT>(state.lastHresult))){
+                        auto focused=xaml::Input::FocusManager::GetFocusedElement();bool restoreFocus=settingsOpen && (focused==row.editor || focused==row.save);
+                        SetEditing(row,false,restoreFocus);
+                    }else if(settingsOpen)row.editor.Focus(xaml::FocusState::Programmatic);
+                }
+            }
         }startup.IsChecked(winrt::box_value(state.autostart!=0).as<wf::IReference<bool>>());startup.IsEnabled(!busy);updatingSettings=false;
     }
     void Attach(ctl::Grid const& footer){

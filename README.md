@@ -21,7 +21,7 @@ Select a device with one click, hide unused devices, and give them names you rec
 
 ## Install
 
-Download `QuickAudio-Setup-0.1.0-x64.exe` from [Releases](https://github.com/alexander-62/quick-audio/releases).
+Download `QuickAudio-Setup-0.1.1-x64.exe` from [Releases](https://github.com/alexander-62/quick-audio/releases).
 Run the installer and choose whether to start QuickAudio with Windows. Then press **Win + A**.
 The current release's interface is in Russian; the installer supports Russian and English.
 
@@ -37,7 +37,9 @@ Use the small gear next to **Также для звонков** (Also for calls)
 The settings page stays inside the panel, with its own scrollbar and a Back button.
 
 - A checked device is visible in our selector; unchecking it does not disable its hardware.
-- Type a custom name and press **✓** or **Enter** to save it.
+- Each device occupies one row: visibility checkbox, name, and pencil button.
+- Click the pencil to edit the name in place; the button becomes **✓**.
+- Press **✓** or **Enter** to save, or **Esc** to cancel.
 - Clear the field and save to restore the original Windows name.
 - The tooltip retains the original name when an alias is used.
 
@@ -50,7 +52,7 @@ Some apps apply the change only when a recording/playback session is restarted.
 - Tested on Windows 11 build **26300.9457**; other builds are not yet verified.
 - No separate Visual C++ Redistributable is required; the runtime is linked statically.
 
-This is an early **0.1.0** release. Windows does not offer a stable third-party extension API
+This is an early **0.1.1** release. Windows does not offer a stable third-party extension API
 for this panel. QuickAudio uses XAML Diagnostics and the undocumented PolicyConfig interface.
 Windows updates may require adaptations. Unsupported layouts are logged instead of patched blindly.
 Release binaries are currently unsigned.
@@ -85,10 +87,10 @@ See [development notes](docs/DEVELOPMENT.md) and [testing](docs/TESTING.md).
 
 ## Versioning
 
-Releases use `MAJOR.MINOR.PATCH`, currently **0.1.0**.
+Releases use `MAJOR.MINOR.PATCH`, currently **0.1.1**.
 User-facing version numbers and the internal IPC protocol version are separate.
 Use `scripts/set-version.ps1` when preparing a new release; see [CHANGELOG](CHANGELOG.md).
-There is no automatic updater in 0.1.0; install the next release over the current version.
+There is no automatic updater in 0.1.1; install the next release over the current version.
 
 ## License and credits
 

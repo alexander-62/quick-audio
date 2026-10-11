@@ -16,6 +16,8 @@ desktop Quick Settings panel or connected audio hardware.
 - Check that switching does not change panel height.
 - Open settings; verify that the heading and first item are reachable at your display scale.
 - Rename a device using ✓ and Enter. Clear the name to restore the original.
+- Verify that a settings row is single-line until its pencil is clicked, editing
+  replaces the label in place, Enter/✓ save, and Esc restores the saved label.
 - Hide/show an endpoint, close/reopen the panel, and restart the agent; verify persistence.
 - Enable/disable startup in each UI; confirm the current-user Run entry and Windows startup behavior.
 - Test communications synchronization both enabled and disabled.
@@ -39,4 +41,14 @@ and OS variants. This project has so far been tested on x64 build 26300.9457.
   busy-state height stability was measured on the real XAML panel.
 
 Hardware disconnection variants, ARM64, and other Windows builds have not been verified.
-The new inline settings layout still needs user visual confirmation at their display scale.
+The user supplied a screenshot of the contained settings page. The compact rename
+interaction introduced in 0.1.1 still needs user visual confirmation.
+
+## Completed for 0.1.1
+
+- Local C++20 build and version smoke checks.
+- Updated the running per-user installation from 0.1.0 to 0.1.1.
+- Real IPC checks passed: Unicode/quoted alias roundtrip, visibility and startup
+  restoration, and unchanged audio defaults.
+- Compact rename code reviewed for fixed row height, single-line overflow,
+  keyboard cancellation, and completion of the specific save request.
