@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2 — 2026-10-12
+
+- Manual Automatic / Русский / English language selectors below startup in controls and panel settings.
+- Persist the selected language and refresh both interfaces without restarting or changing audio defaults.
+- Test language overrides, automatic fallback, persistence, external changes, and preservation of aliases.
+
 ## 0.2.1 — 2026-10-11
 
 - Russian and English panel, controls, accessibility labels, and update messages.

@@ -92,22 +92,29 @@ inline HWND Child(HWND parent,const wchar_t* klass,const wchar_t* title,DWORD st
     SendMessageW(child,WM_SETFONT,reinterpret_cast<WPARAM>(font),TRUE);return child;
 }
 inline LRESULT CALLBACK ManagerProc(HWND window,UINT message,WPARAM wp,LPARAM lp){
-    static HFONT font=nullptr;static HWND status=nullptr,start=nullptr,stop=nullptr,startup=nullptr,updateStatus=nullptr,updateButton=nullptr;static std::shared_ptr<UpdateUi> update;
+    static HFONT font=nullptr;static HWND status=nullptr,start=nullptr,stop=nullptr,startup=nullptr,updateStatus=nullptr,updateButton=nullptr;static std::shared_ptr<UpdateUi> update;static HWND language=nullptr;static Language builtLanguage=LanguageMode();
     switch(message){
     case WM_CREATE:{
         font=CreateFontW(-MulDiv(16,GetDpiForWindow(window),96),0,0,0,FW_NORMAL,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,DEFAULT_PITCH,L"Segoe UI");
         Child(window,L"STATIC",L"QuickAudio " QA_VERSION_W,0,20,16,350,24,0,font);
-        Child(window,L"STATIC",qa::Text(L"Выход звука и микрофон прямо в Win + A",L"Audio output and microphone in Win + A"),0,20,48,350,24,0,font);
+        Child(window,L"STATIC",qa::Text(L"Выход звука и микрофон прямо в Win + A",L"Audio output and microphone in Win + A"),0,20,48,350,24,201,font);
         status=Child(window,L"STATIC",L"",0,20,82,350,24,0,font);
         start=Child(window,L"BUTTON",qa::Text(L"Включить",L"Enable"),WS_TABSTOP|BS_PUSHBUTTON,20,116,158,32,101,font);
         stop=Child(window,L"BUTTON",qa::Text(L"Выключить",L"Disable"),WS_TABSTOP|BS_PUSHBUTTON,190,116,158,32,102,font);
         startup=Child(window,L"BUTTON",qa::Text(L"Запускать вместе с Windows",L"Start with Windows"),WS_TABSTOP|BS_AUTOCHECKBOX,20,166,340,28,103,font);
-        Child(window,L"BUTTON",qa::Text(L"Папка настроек",L"Settings folder"),WS_TABSTOP|BS_PUSHBUTTON,20,208,158,32,104,font);
-        Child(window,L"BUTTON",L"GitHub",WS_TABSTOP|BS_PUSHBUTTON,190,208,158,32,105,font);
-        Child(window,L"STATIC",qa::Text(L"Обновления",L"Updates"),0,20,258,328,24,0,font);
-        updateStatus=Child(window,L"STATIC",qa::Text(L"Проверка выполняется по нажатию кнопки.",L"Click the button to check for updates."),0,20,288,328,46,0,font);
-        updateButton=Child(window,L"BUTTON",qa::Text(L"Проверить обновления",L"Check for updates"),WS_TABSTOP|BS_PUSHBUTTON,20,342,328,34,106,font);
-        Child(window,L"BUTTON",qa::Text(L"Что нового в последнем выпуске",L"Latest release notes"),WS_TABSTOP|BS_PUSHBUTTON,20,386,328,30,107,font);
+        Child(window,L"BUTTON",qa::Text(L"Папка настроек",L"Settings folder"),WS_TABSTOP|BS_PUSHBUTTON,20,252,158,32,104,font);
+        Child(window,L"BUTTON",L"GitHub",WS_TABSTOP|BS_PUSHBUTTON,190,252,158,32,105,font);
+        Child(window,L"STATIC",qa::Text(L"Обновления",L"Updates"),0,20,302,328,24,202,font);
+        updateStatus=Child(window,L"STATIC",qa::Text(L"Проверка выполняется по нажатию кнопки.",L"Click the button to check for updates."),0,20,332,328,46,0,font);
+        updateButton=Child(window,L"BUTTON",qa::Text(L"Проверить обновления",L"Check for updates"),WS_TABSTOP|BS_PUSHBUTTON,20,386,328,34,106,font);
+        Child(window,L"BUTTON",qa::Text(L"Что нового в последнем выпуске",L"Latest release notes"),WS_TABSTOP|BS_PUSHBUTTON,20,430,328,30,107,font);
+        Child(window,L"STATIC",Text(L"Язык",L"Language"),0,20,208,80,28,203,font);
+        language=Child(window,L"COMBOBOX",L"",WS_TABSTOP|CBS_DROPDOWNLIST|WS_VSCROLL,100,204,248,150,108,font);
+        SendMessageW(language,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(Text(L"Автоматически",L"Automatic")));
+        SendMessageW(language,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(L"Русский"));
+        SendMessageW(language,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(L"English"));
+        SendMessageW(language,CB_SETCURSEL,static_cast<WPARAM>(LanguageMode()),0);
+        builtLanguage=LanguageMode();
         update=std::make_shared<UpdateUi>();update->window=window;
         SetTimer(window,1,1000,nullptr);SendMessageW(window,WM_TIMER,1,0);return 0;}
     case OpenUpdates:{SetFocus(updateButton);UpdateStage stage;{std::lock_guard<std::mutex> lock(update->mutex);stage=update->stage;}if(stage==UpdateStage::Idle || stage==UpdateStage::Error)CheckUpdates(update);return 0;}
@@ -130,9 +137,33 @@ inline LRESULT CALLBACK ManagerProc(HWND window,UINT message,WPARAM wp,LPARAM lp
             }).detach();
         }catch(updates::Error const& e){update->Fail(e.message);}catch(...){update->Fail(qa::Text(L"Не удалось запустить обновление. Повторите позже.",L"Could not start the update. Try again later."));}
         return 0;}
-    case WM_TIMER:{bool running=AgentRunning();SetWindowTextW(status,running?qa::Text(L"Панель включена — откройте Win + A",L"Panel enabled — open Win + A"):qa::Text(L"Панель выключена",L"Panel disabled"));EnableWindow(start,!running);EnableWindow(stop,running);SendMessageW(startup,BM_SETCHECK,StartupEnabled()?BST_CHECKED:BST_UNCHECKED,0);return 0;}
+    case WM_TIMER:{
+        RefreshLanguage();
+        if(builtLanguage!=LanguageMode()){
+            builtLanguage=LanguageMode();
+            SetWindowTextW(window,Text(L"QuickAudio — настройки",L"QuickAudio — Settings"));
+            SetWindowTextW(GetDlgItem(window,201),Text(L"Выход звука и микрофон прямо в Win + A",L"Audio output and microphone in Win + A"));
+            SetWindowTextW(start,Text(L"Включить",L"Enable"));SetWindowTextW(stop,Text(L"Выключить",L"Disable"));
+            SetWindowTextW(startup,Text(L"Запускать вместе с Windows",L"Start with Windows"));
+            SetWindowTextW(GetDlgItem(window,104),Text(L"Папка настроек",L"Settings folder"));
+            SetWindowTextW(GetDlgItem(window,202),Text(L"Обновления",L"Updates"));
+            SetWindowTextW(GetDlgItem(window,203),Text(L"Язык",L"Language"));
+            SetWindowTextW(GetDlgItem(window,107),Text(L"Что нового в последнем выпуске",L"Latest release notes"));
+            SendMessageW(language,CB_RESETCONTENT,0,0);
+            SendMessageW(language,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(Text(L"Автоматически",L"Automatic")));
+            SendMessageW(language,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(L"Русский"));
+            SendMessageW(language,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(L"English"));
+            {std::lock_guard<std::mutex> lock(update->mutex);
+                if(update->stage==UpdateStage::Idle || update->stage==UpdateStage::Error)update->message=Text(L"Проверка выполняется по нажатию кнопки.",L"Click the button to check for updates.");
+                if(update->stage==UpdateStage::Available)update->message=Text(L"Доступна версия ",L"Version available: ")+update->release.version;
+            }
+            PostMessageW(window,UpdateChanged,0,0);
+        }
+        SendMessageW(language,CB_SETCURSEL,static_cast<WPARAM>(LanguageMode()),0);
+        bool running=AgentRunning();SetWindowTextW(status,running?qa::Text(L"Панель включена — откройте Win + A",L"Panel enabled — open Win + A"):qa::Text(L"Панель выключена",L"Panel disabled"));EnableWindow(start,!running);EnableWindow(stop,running);SendMessageW(startup,BM_SETCHECK,StartupEnabled()?BST_CHECKED:BST_UNCHECKED,0);return 0;}
     case WM_COMMAND:{auto id=LOWORD(wp);bool ok=true;
-        if(id==101)ok=LaunchAgent();else if(id==102)ok=StopAgent()==0;
+        if(id==108 && HIWORD(wp)==CBN_SELCHANGE){auto index=SendMessageW(language,CB_GETCURSEL,0,0);ok=index>=0 && index<=2 && SetLanguage(static_cast<Language>(index));}
+        else if(id==101)ok=LaunchAgent();else if(id==102)ok=StopAgent()==0;
         else if(id==103)ok=SetStartup(SendMessageW(startup,BM_GETCHECK,0,0)==BST_CHECKED,ExePath())==ERROR_SUCCESS;
         else if(id==104)ShellExecuteW(window,L"open",DataDir().c_str(),nullptr,nullptr,SW_SHOWNORMAL);
         else if(id==105)ShellExecuteW(window,L"open",L"https://github.com/alexander-62/quick-audio",nullptr,nullptr,SW_SHOWNORMAL);
@@ -155,7 +186,7 @@ inline int ShowManager(HINSTANCE instance,bool checkUpdates=false){
     const wchar_t* name=L"QuickAudio.Manager";auto existing=FindWindowW(name,nullptr);if(existing){ShowWindow(existing,SW_RESTORE);SetForegroundWindow(existing);if(checkUpdates)PostMessageW(existing,OpenUpdates,0,0);return 0;}
     INITCOMMONCONTROLSEX common{sizeof(common),ICC_STANDARD_CLASSES};InitCommonControlsEx(&common);
     WNDCLASSW klass{};klass.hInstance=instance;klass.lpszClassName=name;klass.lpfnWndProc=ManagerProc;klass.hCursor=LoadCursorW(nullptr,MAKEINTRESOURCEW(32512));klass.hIcon=LoadIconW(instance,MAKEINTRESOURCEW(1));klass.hbrBackground=reinterpret_cast<HBRUSH>(COLOR_WINDOW+1);RegisterClassW(&klass);
-    UINT dpi=GetDpiForSystem();RECT rect{0,0,MulDiv(374,dpi,96),MulDiv(438,dpi,96)};AdjustWindowRectExForDpi(&rect,WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX,FALSE,0,dpi);
+    UINT dpi=GetDpiForSystem();RECT rect{0,0,MulDiv(374,dpi,96),MulDiv(482,dpi,96)};AdjustWindowRectExForDpi(&rect,WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX,FALSE,0,dpi);
     auto window=CreateWindowExW(0,name,qa::Text(L"QuickAudio — настройки",L"QuickAudio — Settings"),WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX,CW_USEDEFAULT,CW_USEDEFAULT,rect.right-rect.left,rect.bottom-rect.top,nullptr,nullptr,instance,nullptr);if(!window)return 1;
     ShowWindow(window,SW_SHOWNORMAL);if(checkUpdates)PostMessageW(window,OpenUpdates,0,0);MSG message;while(GetMessageW(&message,nullptr,0,0)>0){if(!IsDialogMessageW(window,&message)){TranslateMessage(&message);DispatchMessageW(&message);}}return 0;
 }

@@ -18,6 +18,12 @@ inline bool EnsureSettings(){
     if(h==INVALID_HANDLE_VALUE)return GetLastError()==ERROR_FILE_EXISTS;
     const wchar_t bom=0xFEFF;DWORD written=0;bool ok=WriteFile(h,&bom,2,&written,nullptr)!=0 && written==2;CloseHandle(h);return ok;
 }
+inline bool SetLanguage(Language mode){
+    if(mode!=Language::Automatic && mode!=Language::Russian && mode!=Language::English)return false;
+    if(!EnsureSettings())return false;
+    bool ok=WritePrivateProfileStringW(L"General",L"Language",mode==Language::Russian?L"ru":mode==Language::English?L"en":L"auto",SettingsFile().c_str())!=0;
+    if(ok)RefreshLanguage();return ok;
+}
 inline std::wstring ExePath(){wchar_t path[32768];DWORD n=GetModuleFileNameW(nullptr,path,32768);return std::wstring(path,n);}
 inline std::wstring Quote(std::wstring const& text){return L"\""+text+L"\"";}
 inline constexpr wchar_t RunKey[]=L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";

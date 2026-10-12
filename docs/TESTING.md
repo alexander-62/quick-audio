@@ -80,3 +80,14 @@ Device names from Windows and user aliases must remain unchanged. Check long mes
 and labels at 100%, 150%, and 200% scaling, and recovery after the audio service reconnects.
 The existing 0.2.0 release binaries remain Russian-only.
 
+
+## Manual language selection
+
+Run `tests/build-language.cmd` and `build/language-test.exe` for isolated Windows
+profile tests (the real account preferences are not changed).
+In both controls and Win + A settings, choose Automatic, Русский, and English.
+Confirm labels change without restarting, the settings page stays open, the other
+window follows, and relaunching preserves the choice. Automatic follows the Windows
+display language. Confirm device aliases, hidden devices, audio defaults, and startup
+remain unchanged. Check keyboard operation, screen reader labels, scaling, a failed
+settings write, and language changes during an update or audio-service reconnection.

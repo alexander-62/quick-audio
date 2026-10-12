@@ -22,11 +22,13 @@ Select a device with one click, hide unused devices, and give them names you rec
 
 ## Install
 
-Download `QuickAudio-Setup-0.2.1-x64.exe` from [Releases](https://github.com/alexander-62/quick-audio/releases).
+Download `QuickAudio-Setup-0.2.2-x64.exe` from [Releases](https://github.com/alexander-62/quick-audio/releases).
 Run the installer and choose whether to start QuickAudio with Windows. Then press **Win + A**.
 The panel, controls, update messages, and installer support Russian and English.
-QuickAudio uses Russian for a Russian Windows display language and English otherwise.
-Restart QuickAudio after changing the Windows display language.
+Choose **Language → Automatic / Русский / English** below **Start with Windows**
+in QuickAudio controls or the Win + A panel settings. The selection applies immediately,
+is shared between both windows, and is saved for future launches.
+Automatic uses Russian for a Russian Windows display language and English otherwise.
 
 Open **QuickAudio** from the Start menu to turn the panel on/off or change startup behavior.
 Turning the panel off for this session and disabling startup are independent controls.
@@ -55,7 +57,7 @@ Some apps apply the change only when a recording/playback session is restarted.
 - Tested on Windows 11 build **26300.9457**; other builds are not yet verified.
 - No separate Visual C++ Redistributable is required; the runtime is linked statically.
 
-This is an early **0.2.1** release. Windows does not offer a stable third-party extension API
+This is an early **0.2.2** release. Windows does not offer a stable third-party extension API
 for this panel. QuickAudio uses XAML Diagnostics and the undocumented PolicyConfig interface.
 Windows updates may require adaptations. Unsupported layouts are logged instead of patched blindly.
 Release binaries are currently unsigned.
@@ -92,7 +94,7 @@ See [development notes](docs/DEVELOPMENT.md) and [testing](docs/TESTING.md).
 
 ## Versioning
 
-Releases use `MAJOR.MINOR.PATCH`, currently **0.2.1**.
+Releases use `MAJOR.MINOR.PATCH`, currently **0.2.2**.
 User-facing version numbers and the internal IPC protocol version are separate.
 Use `scripts/set-version.ps1` when preparing a new release; see [CHANGELOG](CHANGELOG.md).
 Click **Check for updates** in QuickAudio controls, or use the

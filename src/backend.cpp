@@ -153,6 +153,7 @@ int Run() {
                     if(WritePrivateProfileStringW(L"Audio",L"SyncCalls",request.flow?L"1":L"0",SettingsFile().c_str()))current.syncCalls=request.flow?1:0;else hr=HRESULT_FROM_WIN32(GetLastError());
                 }
                 else if(request.kind==7){hr=HRESULT_FROM_WIN32(SetStartup(request.flow!=0,ExePath()));}
+                else if(request.kind==9){hr=request.flow<=2 && SetLanguage(static_cast<Language>(request.flow))?S_OK:E_FAIL;}
                 else if(request.kind==8){hr=reinterpret_cast<INT_PTR>(ShellExecuteW(nullptr,L"open",ExePath().c_str(),L"--updates",nullptr,SW_SHOWNORMAL))>32?S_OK:E_FAIL;}
                 else if(request.kind==4 || request.kind==5 || request.kind==6){
                     bool known=false;if(request.flow<2)for(DWORD i=0;i<current.count[request.flow];++i)if(!wcscmp(current.devices[request.flow][i].id,request.commandId))known=true;
@@ -169,10 +170,10 @@ int Run() {
                 current.completed=request.request;current.lastHresult=hr;
                 if(FAILED(hr))Copy(current.status,request.kind==1?qa::Text(L"Не удалось переключить устройство. Проверьте подключение и попробуйте снова.",L"Could not switch devices. Check the connection and try again."):qa::Text(L"Не удалось сохранить настройку. Попробуйте снова.",L"Could not save the setting. Try again."));
             }
-            auto hr=audio.Read(current);
+            RefreshLanguage();auto hr=audio.Read(current);
             current.autostart=StartupEnabled()?1:0;
             if(FAILED(hr)){current.lastHresult=hr;current.count[0]=current.count[1]=0;Copy(current.status,qa::Text(L"Аудиослужба недоступна. Повторяем подключение…",L"Audio service unavailable. Reconnecting…"));}
-            else if(wcscmp(current.status,qa::Text(L"Аудиослужба недоступна. Повторяем подключение…",L"Audio service unavailable. Reconnecting…"))==0){current.status[0]=0;current.lastHresult=0;}
+            else if(wcscmp(current.status,L"Аудиослужба недоступна. Повторяем подключение…")==0 || wcscmp(current.status,L"Audio service unavailable. Reconnecting…")==0){current.status[0]=0;current.lastHresult=0;}
             Publish(bus,current);
             HANDLE events[]{bus.stop,bus.command,refresh};auto reason=WaitForMultipleObjects(3,events,FALSE,5000);
             if(reason==WAIT_OBJECT_0+2){if(WaitForSingleObject(bus.stop,150)==WAIT_OBJECT_0)break;ResetEvent(refresh);}
