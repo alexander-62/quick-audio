@@ -9,5 +9,7 @@ if not defined VSCMD_VER call "%QA_VS%\VC\Auxiliary\Build\vcvars64.bat"
 if errorlevel 1 exit /b 1
 if not exist build mkdir build
 cl /nologo /std:c++20 /EHsc /utf-8 /MT tests\language.cpp /Fo:build\language-test.obj /Fe:build\language-test.exe /link advapi32.lib shell32.lib
+if errorlevel 1 exit /b 1
+cl /nologo /std:c++20 /EHsc /utf-8 /MT tests\language-ipc.cpp /Fo:build\language-ipc.obj /Fe:build\language-ipc.exe /link advapi32.lib shell32.lib
 exit /b %errorlevel%
 

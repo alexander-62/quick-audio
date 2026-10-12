@@ -11,7 +11,7 @@
 #include <cstring>
 #include "product.h"
 namespace qa {
-constexpr DWORD Magic=0x51415032, Version=3;
+constexpr DWORD Magic=0x51415032, Version=4;
 constexpr size_t MaxDevices=64, IdSize=512, NameSize=256;
 constexpr CLSID TapClsid{0x05c1af10,0x9e71,0x4125,{0x85,0x12,0xb4,0xf4,0x1e,0x73,0x01,0x00}};
 struct Device { wchar_t id[IdSize]; wchar_t name[NameSize],alias[NameSize]; DWORD form,hidden; };
@@ -20,19 +20,19 @@ struct State {
     unsigned long long revision,request,completed,generation;
     DWORD syncCalls,flow,kind;
     wchar_t commandId[IdSize];
-    wchar_t commandName[NameSize];DWORD autostart;
+    wchar_t commandName[NameSize];DWORD autostart,language;
     DWORD count[2]; Device devices[2][MaxDevices];
     wchar_t defaults[2][3][IdSize];
     wchar_t status[384]; DWORD lastHresult;
 };
 template<size_t N> void Copy(wchar_t (&dest)[N],std::wstring const& s) { wcsncpy_s(dest,s.c_str(),_TRUNCATE); }
 inline std::wstring BaseName() {
-    HANDLE token; if(!OpenProcessToken(GetCurrentProcess(),TOKEN_QUERY,&token)) return L"Local\\QuickAudio_v3";
+    HANDLE token; if(!OpenProcessToken(GetCurrentProcess(),TOKEN_QUERY,&token)) return L"Local\\QuickAudio_v4";
     DWORD size=0; GetTokenInformation(token,TokenUser,nullptr,0,&size);
     std::string storage(size,'\0');
-    if(!GetTokenInformation(token,TokenUser,storage.data(),size,&size)) {CloseHandle(token);return L"Local\\QuickAudio_v3";}
+    if(!GetTokenInformation(token,TokenUser,storage.data(),size,&size)) {CloseHandle(token);return L"Local\\QuickAudio_v4";}
     LPWSTR sid=nullptr; ConvertSidToStringSidW(reinterpret_cast<TOKEN_USER*>(storage.data())->User.Sid,&sid);
-    std::wstring result=L"Local\\QuickAudio_v3_"+std::wstring(sid?sid:L"unknown");
+    std::wstring result=L"Local\\QuickAudio_v4_"+std::wstring(sid?sid:L"unknown");
     if(sid) LocalFree(sid); CloseHandle(token); return result;
 }
 inline std::wstring ExeDir() { wchar_t p[32768]; GetModuleFileNameW(nullptr,p,32768);std::wstring s(p);return s.substr(0,s.find_last_of(L'\\')+1); }
@@ -67,7 +67,7 @@ struct Bus {
     bool Snapshot(State& out) {if(!Lock())return false;out=*state;Unlock();return out.magic==Magic && out.version==Version;}
     bool Send(DWORD kind,DWORD flow,std::wstring const& id,std::wstring const& name=L"",unsigned long long* requestNumber=nullptr) {
         if(!Lock(0))return false;
-        bool ok=state->magic==Magic && !state->stopping && state->request==state->completed;
+        bool ok=state->magic==Magic && state->version==Version && !state->stopping && state->request==state->completed;
         if(ok){state->kind=kind;state->flow=flow;Copy(state->commandId,id);Copy(state->commandName,name);++state->request;if(requestNumber)*requestNumber=state->request;}
         Unlock(); if(ok)SetEvent(command);return ok;
     }

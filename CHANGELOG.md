@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.3 — 2026-10-12
+
+- Fix language synchronization between controls and the native Quick Settings panel.
+- Publish the selected language through IPC rather than reading ShellHost's local settings path.
+- Wake the backend immediately when controls change the language; rebuild panel labels without restarting.
+- Add regression checks with different backend/client settings paths and language restoration.
+- Bump the IPC protocol to v4 for the new confirmed language field.
+
 ## 0.2.2 — 2026-10-12
 
 - Manual Automatic / Русский / English language selectors below startup in controls and panel settings.
@@ -42,4 +50,3 @@ First public release.
 
 The earlier experimental builds numbered 1.0/1.2 were local prototypes,
 not public product releases. Product release numbering starts at 0.1.0.
-

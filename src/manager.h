@@ -162,7 +162,7 @@ inline LRESULT CALLBACK ManagerProc(HWND window,UINT message,WPARAM wp,LPARAM lp
         SendMessageW(language,CB_SETCURSEL,static_cast<WPARAM>(LanguageMode()),0);
         bool running=AgentRunning();SetWindowTextW(status,running?qa::Text(L"Панель включена — откройте Win + A",L"Panel enabled — open Win + A"):qa::Text(L"Панель выключена",L"Panel disabled"));EnableWindow(start,!running);EnableWindow(stop,running);SendMessageW(startup,BM_SETCHECK,StartupEnabled()?BST_CHECKED:BST_UNCHECKED,0);return 0;}
     case WM_COMMAND:{auto id=LOWORD(wp);bool ok=true;
-        if(id==108 && HIWORD(wp)==CBN_SELCHANGE){auto index=SendMessageW(language,CB_GETCURSEL,0,0);ok=index>=0 && index<=2 && SetLanguage(static_cast<Language>(index));}
+        if(id==108 && HIWORD(wp)==CBN_SELCHANGE){auto index=SendMessageW(language,CB_GETCURSEL,0,0);ok=index>=0 && index<=2 && SetLanguage(static_cast<Language>(index));if(ok){Bus bus;if(bus.Open(false))SetEvent(bus.command);}}
         else if(id==101)ok=LaunchAgent();else if(id==102)ok=StopAgent()==0;
         else if(id==103)ok=SetStartup(SendMessageW(startup,BM_GETCHECK,0,0)==BST_CHECKED,ExePath())==ERROR_SUCCESS;
         else if(id==104)ShellExecuteW(window,L"open",DataDir().c_str(),nullptr,nullptr,SW_SHOWNORMAL);
@@ -183,6 +183,7 @@ inline LRESULT CALLBACK ManagerProc(HWND window,UINT message,WPARAM wp,LPARAM lp
     }return DefWindowProcW(window,message,wp,lp);
 }
 inline int ShowManager(HINSTANCE instance,bool checkUpdates=false){
+    RefreshLanguage();
     const wchar_t* name=L"QuickAudio.Manager";auto existing=FindWindowW(name,nullptr);if(existing){ShowWindow(existing,SW_RESTORE);SetForegroundWindow(existing);if(checkUpdates)PostMessageW(existing,OpenUpdates,0,0);return 0;}
     INITCOMMONCONTROLSEX common{sizeof(common),ICC_STANDARD_CLASSES};InitCommonControlsEx(&common);
     WNDCLASSW klass{};klass.hInstance=instance;klass.lpszClassName=name;klass.lpfnWndProc=ManagerProc;klass.hCursor=LoadCursorW(nullptr,MAKEINTRESOURCEW(32512));klass.hIcon=LoadIconW(instance,MAKEINTRESOURCEW(1));klass.hbrBackground=reinterpret_cast<HBRUSH>(COLOR_WINDOW+1);RegisterClassW(&klass);
@@ -191,4 +192,3 @@ inline int ShowManager(HINSTANCE instance,bool checkUpdates=false){
     ShowWindow(window,SW_SHOWNORMAL);if(checkUpdates)PostMessageW(window,OpenUpdates,0,0);MSG message;while(GetMessageW(&message,nullptr,0,0)>0){if(!IsDialogMessageW(window,&message)){TranslateMessage(&message);DispatchMessageW(&message);}}return 0;
 }
 }
-

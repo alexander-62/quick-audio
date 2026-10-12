@@ -15,6 +15,15 @@ viewport based on the current monitor's available work area.
 Named IPC objects include the user SID, session namespace, and protocol major
 version. Requests have sequence numbers; the UI displays backend-confirmed state.
 The shared protocol version is independent of the product's semantic version.
+Protocol v4 also carries the backend-confirmed language. The native hook does not
+read language preferences from ShellHost's environment or local INI cache. Language
+changes increase the state revision; the UI rebuilds translated controls on its
+dispatcher once the current command completes. Controls wake the backend after a
+preference write so a change does not have to wait for its recovery poll.
+
+`build/language-ipc.exe`, built by `tests/build-language.cmd`, exercises the live
+agent with a client profile deliberately set to a different language. It restores
+the original language and verifies unchanged audio defaults, aliases, and visibility.
 
 Preferences are UTF-16 INI data under LocalAppData, keyed by endpoint ID. Original
 system names and custom display names remain separate. Aliases are limited to 255

@@ -40,6 +40,12 @@ int main(){
     assert(qa::RefreshLanguage());assert(qa::LanguageMode()==Language::English);
     assert(WritePrivateProfileStringW(L"General",L"Language",L"invalid",qa::SettingsFile().c_str()));
     assert(qa::RefreshLanguage());assert(qa::LanguageMode()==Language::Automatic);
+    // ShellHost must apply the backend mode without reading its own profile.
+    assert(WritePrivateProfileStringW(L"General",L"Language",L"ru",qa::SettingsFile().c_str()));
+    assert(qa::ReadLanguage()==Language::Russian);
+    assert(qa::ApplyLanguage(Language::English));
+    assert(!wcscmp(qa::Text(L"Устройства вывода",L"Output devices"),L"Output devices"));
+    assert(qa::ReadLanguage()==Language::Russian);
     wchar_t alias[64]{};
     GetPrivateProfileStringW(L"OutputNames",L"device",L"",alias,64,qa::SettingsFile().c_str());
     assert(!wcscmp(alias,L"Мой звук"));

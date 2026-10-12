@@ -24,9 +24,10 @@ inline Language ReadLanguage() {
     wchar_t value[16]{};GetPrivateProfileStringW(L"General",L"Language",L"auto",value,16,file.c_str());
     return ParseLanguage(value);
 }
-inline std::atomic<Language>& LanguageStorage(){static std::atomic<Language> mode{ReadLanguage()};return mode;}
+inline std::atomic<Language>& LanguageStorage(){static std::atomic<Language> mode{Language::Automatic};return mode;}
 inline Language LanguageMode(){return LanguageStorage().load();}
-inline bool RefreshLanguage(){auto mode=ReadLanguage();return LanguageStorage().exchange(mode)!=mode;}
+inline bool ApplyLanguage(Language mode){return LanguageStorage().exchange(mode)!=mode;}
+inline bool RefreshLanguage(){return ApplyLanguage(ReadLanguage());}
 inline const wchar_t* Text(const wchar_t* russian,const wchar_t* english) {
     return UseRussian(LanguageMode(),GetUserDefaultUILanguage())?russian:english;
 }

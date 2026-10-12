@@ -11,7 +11,7 @@ if not exist build mkdir build
 cd src
 rc /nologo /c65001 /fo ..\build\app.res app.rc
 if errorlevel 1 exit /b 1
-cl /nologo /std:c++20 /EHsc /utf-8 /MT /O2 /W3 /LD panel.cpp /Fo:..\build\panel.obj /Fe:..\build\QuickAudio.Hook.0.2.2.dll /link /DEF:panel.def /IMPLIB:..\build\QuickAudio.Hook.lib runtimeobject.lib ole32.lib oleaut32.lib user32.lib advapi32.lib shell32.lib uuid.lib
+cl /nologo /std:c++20 /EHsc /utf-8 /MT /O2 /W3 /LD panel.cpp /Fo:..\build\panel.obj /Fe:..\build\QuickAudio.Hook.0.2.3.dll /link /DEF:panel.def /IMPLIB:..\build\QuickAudio.Hook.lib runtimeobject.lib ole32.lib oleaut32.lib user32.lib advapi32.lib shell32.lib uuid.lib
 if errorlevel 1 exit /b 1
 cl /nologo /std:c++20 /EHsc /utf-8 /MT /O2 /W3 backend.cpp ..\build\app.res /Fo:..\build\backend.obj /Fe:..\build\QuickAudio.exe /link /SUBSYSTEM:WINDOWS /ENTRY:wmainCRTStartup runtimeobject.lib ole32.lib oleaut32.lib user32.lib advapi32.lib shell32.lib uuid.lib comctl32.lib gdi32.lib winhttp.lib bcrypt.lib
 exit /b %errorlevel%

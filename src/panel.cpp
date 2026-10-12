@@ -267,6 +267,9 @@ struct View:std::enable_shared_from_this<View>{
     }
     void Apply(std::shared_ptr<qa::State> const& state){
         if(detached || !panel)return;latest=state;updating=true;
+        // ShellHost may see a different or redirected LocalAppData directory.
+        // The backend's confirmed state is the only language source for this UI.
+        qa::ApplyLanguage(state->language<=2?static_cast<qa::Language>(state->language):qa::Language::Automatic);
         if(builtLanguage!=qa::LanguageMode() && state->request==state->completed){bool open=settingsOpen;updatingSettings=true;BuildContent();ShowSettings(open);updatingSettings=false;}
         bool busy=state->request!=state->completed;
         auto accent=winrt::Windows::UI::ViewManagement::UISettings().GetColorValue(winrt::Windows::UI::ViewManagement::UIColorType::Accent);
@@ -301,7 +304,7 @@ struct View:std::enable_shared_from_this<View>{
         Feedback(busy,state->status);
         updating=false;
         if(auto grid=parent.get())grid.InvalidateMeasure();
-        Log(L"UI_STATE revision="+std::to_wstring(state->revision)+L" outputs="+std::to_wstring(state->count[0])+L" microphones="+std::to_wstring(state->count[1])+L" busy="+std::to_wstring(busy)+L" panelHeight="+std::to_wstring(panel.ActualHeight()));
+        Log(L"UI_STATE revision="+std::to_wstring(state->revision)+L" language="+std::to_wstring(state->language)+L" builtLanguage="+std::to_wstring(static_cast<DWORD>(builtLanguage))+L" outputs="+std::to_wstring(state->count[0])+L" microphones="+std::to_wstring(state->count[1])+L" busy="+std::to_wstring(busy)+L" panelHeight="+std::to_wstring(panel.ActualHeight()));
     }
     void Detach(){
         if(detached)return;detached=true;
@@ -330,15 +333,15 @@ void ForViews(std::shared_ptr<qa::State> state,bool remove=false){
 void Listen(){
     try{
         auto bus=std::make_shared<qa::Bus>();if(!bus->Open(false)){Log(L"BUS_OPEN_ERROR "+std::to_wstring(GetLastError()));return;}std::atomic_store(&sharedBus,bus);
-        unsigned long long previous=~0ULL,previousGeneration=0;DWORD owner=0;HANDLE process=nullptr;
+        unsigned long long previous=~0ULL,previousGeneration=0;DWORD previousLanguage=~0UL,owner=0;HANDLE process=nullptr;
         while(!stopping){
             auto state=std::make_shared<qa::State>();
             if(bus->Snapshot(*state)){
                 if(state->stopping)break;
                 if(state->ownerPid!=owner){if(process)CloseHandle(process);owner=state->ownerPid;process=OpenProcess(SYNCHRONIZE,FALSE,owner);}
                 if(process && WaitForSingleObject(process,0)==WAIT_OBJECT_0)break;
-                bool languageChanged=qa::RefreshLanguage();
-                if(languageChanged || state->revision!=previous || state->generation!=previousGeneration){previous=state->revision;previousGeneration=state->generation;ForViews(state);}
+                bool languageChanged=state->language!=previousLanguage;
+                if(languageChanged || state->revision!=previous || state->generation!=previousGeneration){previous=state->revision;previousGeneration=state->generation;previousLanguage=state->language;ForViews(state);}
             }
             HANDLE events[]{bus->stop,bus->changed};if(WaitForMultipleObjects(2,events,FALSE,500)==WAIT_OBJECT_0)break;
         }
@@ -384,4 +387,3 @@ struct Factory:winrt::implements<Factory,IClassFactory,winrt::non_agile>{
 STDAPI DllGetClassObject(REFCLSID cls,REFIID iid,void** p){if(cls!=qa::TapClsid)return CLASS_E_CLASSNOTAVAILABLE;try{return winrt::make<Factory>().as(iid,p);}catch(...){return winrt::to_hresult();}}
 STDAPI DllCanUnloadNow(){return S_FALSE;}
 BOOL WINAPI DllMain(HMODULE module,DWORD why,LPVOID){if(why==DLL_PROCESS_ATTACH){moduleHandle=module;DisableThreadLibraryCalls(module);}return TRUE;}
-

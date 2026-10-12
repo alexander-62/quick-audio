@@ -99,10 +99,10 @@ struct Audio {
 void Publish(Bus& bus,State const& audio) {
     if(!bus.Lock())return;
     auto const& old=*bus.state;
-    bool different=old.count[0]!=audio.count[0] || old.count[1]!=audio.count[1] || memcmp(old.devices,audio.devices,sizeof(old.devices)) || memcmp(old.defaults,audio.defaults,sizeof(old.defaults)) || wcscmp(old.status,audio.status) || old.completed!=audio.completed || old.syncCalls!=audio.syncCalls || old.autostart!=audio.autostart || old.lastHresult!=audio.lastHresult;
+    bool different=old.count[0]!=audio.count[0] || old.count[1]!=audio.count[1] || memcmp(old.devices,audio.devices,sizeof(old.devices)) || memcmp(old.defaults,audio.defaults,sizeof(old.defaults)) || wcscmp(old.status,audio.status) || old.completed!=audio.completed || old.syncCalls!=audio.syncCalls || old.autostart!=audio.autostart || old.language!=audio.language || old.lastHresult!=audio.lastHresult;
     bus.state->count[0]=audio.count[0];bus.state->count[1]=audio.count[1];
     memcpy(bus.state->devices,audio.devices,sizeof(audio.devices));memcpy(bus.state->defaults,audio.defaults,sizeof(audio.defaults));
-    Copy(bus.state->status,audio.status);bus.state->lastHresult=audio.lastHresult;bus.state->completed=audio.completed;bus.state->syncCalls=audio.syncCalls;bus.state->autostart=audio.autostart;
+    Copy(bus.state->status,audio.status);bus.state->lastHresult=audio.lastHresult;bus.state->completed=audio.completed;bus.state->syncCalls=audio.syncCalls;bus.state->autostart=audio.autostart;bus.state->language=audio.language;
     if(different)++bus.state->revision;bus.Unlock();if(different)SetEvent(bus.changed);
 }
 HRESULT Inject(DWORD pid,std::wstring const& dll) {
@@ -170,7 +170,7 @@ int Run() {
                 current.completed=request.request;current.lastHresult=hr;
                 if(FAILED(hr))Copy(current.status,request.kind==1?qa::Text(L"Не удалось переключить устройство. Проверьте подключение и попробуйте снова.",L"Could not switch devices. Check the connection and try again."):qa::Text(L"Не удалось сохранить настройку. Попробуйте снова.",L"Could not save the setting. Try again."));
             }
-            RefreshLanguage();auto hr=audio.Read(current);
+            RefreshLanguage();current.language=static_cast<DWORD>(LanguageMode());auto hr=audio.Read(current);
             current.autostart=StartupEnabled()?1:0;
             if(FAILED(hr)){current.lastHresult=hr;current.count[0]=current.count[1]=0;Copy(current.status,qa::Text(L"Аудиослужба недоступна. Повторяем подключение…",L"Audio service unavailable. Reconnecting…"));}
             else if(wcscmp(current.status,L"Аудиослужба недоступна. Повторяем подключение…")==0 || wcscmp(current.status,L"Audio service unavailable. Reconnecting…")==0){current.status[0]=0;current.lastHresult=0;}
@@ -206,4 +206,3 @@ int wmain(int argc,wchar_t** argv) {
     }
     if(action!=L"--run")return 2;CoInitializeEx(nullptr,COINIT_MULTITHREADED);auto result=Run();CoUninitialize();return result;
 }
-

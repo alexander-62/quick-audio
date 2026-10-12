@@ -12,6 +12,9 @@ desktop Quick Settings panel or connected audio hardware.
 
 - Install as a normal user; verify Start menu and Installed apps registration.
 - Open Win + A and verify that both selectors precede the standard controls.
+- Change the language in controls while the panel exists. Verify translated
+  selector headings, inline settings, tooltips, and language selection without
+  disabling/re-enabling. Repeat the change from the inline language selector.
 - Select an output and microphone; confirm Windows defaults and native selection marks.
 - Check that switching does not change panel height.
 - Open settings; verify that the heading and first item are reachable at your display scale.
@@ -70,6 +73,18 @@ interaction introduced in 0.1.1 still needs user visual confirmation.
 The update-window visual check and button-driven installer handoff have not yet
 been exercised through UI automation: access approval for QuickAudio timed out.
 The normal installer upgrade path was exercised independently and passed.
+
+## Completed for 0.2.3
+
+- Built and installed over the running 0.2.2 installation, preserving English.
+- Isolated regression: a Russian client INI cannot override backend-confirmed English.
+- Live v4 IPC regression: English → Russian → English → Automatic; verified
+  published mode and increasing revision for each command, then restored English.
+- Confirmed unchanged audio defaults, aliases, and device visibility throughout.
+- Confirmed the hook no longer reads or refreshes language from ShellHost's INI path.
+
+The live IPC checks verify state transport and translation selection. They do not
+claim interactive visual confirmation of the native panel's language controls.
 
 ## Russian and English interface
 
