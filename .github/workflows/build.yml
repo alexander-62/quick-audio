@@ -56,13 +56,23 @@ jobs:
           test -s "dist/QuickAudio-Setup-$version-x64.exe"
           test -s "dist/QuickAudio-Portable-$version-x64.zip"
           (cd dist && sha256sum --check SHA256SUMS.txt)
-          gh release create "$tag" --target "$GITHUB_SHA" --title "QuickAudio $version" --notes-file "$notes" --draft \
-            "dist/QuickAudio-Setup-$version-x64.exe" "dist/QuickAudio-Portable-$version-x64.zip" dist/SHA256SUMS.txt
-          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" > /tmp/quickaudio-release.json
+          release_id=$(gh api "repos/$GITHUB_REPOSITORY/releases" --jq ".[] | select(.tag_name == \"$tag\") | .id")
+          if [[ -n "$release_id" ]]; then
+            test "$(gh api "repos/$GITHUB_REPOSITORY/releases/$release_id" --jq '.draft')" = true
+            gh release edit "$tag" --target "$GITHUB_SHA" --title "QuickAudio $version" --notes-file "$notes"
+            gh release upload "$tag" --clobber "dist/QuickAudio-Setup-$version-x64.exe" "dist/QuickAudio-Portable-$version-x64.zip" dist/SHA256SUMS.txt
+          else
+            gh release create "$tag" --target "$GITHUB_SHA" --title "QuickAudio $version" --notes-file "$notes" --draft \
+              "dist/QuickAudio-Setup-$version-x64.exe" "dist/QuickAudio-Portable-$version-x64.zip" dist/SHA256SUMS.txt
+            release_id=$(gh api "repos/$GITHUB_REPOSITORY/releases" --jq ".[] | select(.tag_name == \"$tag\") | .id")
+          fi
+          test -n "$release_id"
+          gh api "repos/$GITHUB_REPOSITORY/releases/$release_id" > /tmp/quickaudio-release.json
           python3 - <<'PY'
-          import hashlib, json, pathlib
+          import hashlib, json, os, pathlib
           release = json.loads(pathlib.Path('/tmp/quickaudio-release.json').read_text())
           assert release['draft'], 'Release must remain a draft until verified'
+          assert release['target_commitish'] == os.environ['GITHUB_SHA'], 'Release must target this build'
           assets = {a['name']: a for a in release['assets']}
           files = list(pathlib.Path('dist').iterdir())
           assert set(assets) == {p.name for p in files}, 'Unexpected release assets'
