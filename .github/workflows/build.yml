@@ -70,7 +70,12 @@ jobs:
           else
             gh release create "$tag" --target "$GITHUB_SHA" --title "QuickAudio $version" --notes-file "$notes" --draft \
               "dist/QuickAudio-Setup-$version-x64.exe" "dist/QuickAudio-Portable-$version-x64.zip" dist/SHA256SUMS.txt
-            release_id=$(gh api "repos/$GITHUB_REPOSITORY/releases" --jq ".[] | select(.tag_name == \"$tag\") | .id")
+            # A newly created draft may take a moment to appear in the listing.
+            for attempt in {1..10}; do
+              release_id=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" -H "Cache-Control: no-cache" --jq ".[] | select(.tag_name == \"$tag\") | .id")
+              [[ -n "$release_id" ]] && break
+              sleep 2
+            done
           fi
           test -n "$release_id"
           gh api "repos/$GITHUB_REPOSITORY/releases/$release_id" > /tmp/quickaudio-release.json
