@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // XAML Diagnostics / COM TAP pattern adapted from m417z/UWPSpy (GPL-3.0).
 #include "shared.h"
+#include "layout.h"
 #include <ocidl.h>
 #include <xamlom.h>
 #include <mmdeviceapi.h>
@@ -56,6 +57,8 @@ struct View:std::enable_shared_from_this<View>{
     ctl::Button settingsButton{nullptr};ctl::ScrollViewer settingsScroll{nullptr};ctl::CheckBox startup{nullptr};ctl::StackPanel settingsItems[2]{nullptr,nullptr};std::vector<SettingRow> settingRows[2];
     ctl::ComboBox language{nullptr};qa::Language builtLanguage=qa::LanguageMode();
     ctl::RowDefinition extraRow{nullptr};
+    ctl::ScrollViewer viewport{nullptr};double nativeHeight=0,lastBudget=-1;winrt::event_token layoutToken{};
+    std::vector<std::pair<ctl::RowDefinition,wf::IInspectable>> rowMinimums;
     std::vector<std::pair<winrt::weak_ref<xaml::FrameworkElement>,int>> shifted;
     std::vector<std::pair<winrt::weak_ref<xaml::FrameworkElement>,wf::IInspectable>> heights;
     std::shared_ptr<qa::State> latest;
@@ -104,26 +107,22 @@ struct View:std::enable_shared_from_this<View>{
         for(auto& row:settingRows[flow])if(id==row.device.id && row.editing && !row.pendingRename){SetEditing(row,false,true);return;}
     }
     void ShowSettings(bool show){
-        if(show){
-            auto foreground=GetForegroundWindow();MONITORINFO monitor{sizeof(monitor)};
-            if(GetMonitorInfoW(MonitorFromWindow(foreground,MONITOR_DEFAULTTONEAREST),&monitor)){
-                double dpi=GetDpiForWindow(foreground);if(dpi<=0)dpi=96;
-                double available=(monitor.rcWork.bottom-monitor.rcWork.top)*96.0/dpi;
-                double native=333;if(auto grid=parent.get())native=std::max(0.0,grid.ActualHeight()-panel.ActualHeight());
-                settingsScroll.MaxHeight(std::clamp(available-native-130,96.0,240.0));
-            }
-        }
         if(!show)for(auto& group:settingRows)for(auto& row:group)if(row.editing && !row.pendingRename)SetEditing(row,false);
         settingsOpen=show;devicesPage.Visibility(show?xaml::Visibility::Collapsed:xaml::Visibility::Visible);settingsPage.Visibility(show?xaml::Visibility::Visible:xaml::Visibility::Collapsed);
-        Log(show?L"SETTINGS_OPEN inline=1":L"SETTINGS_CLOSE");
+        UpdateHeightBudget();Log(show?L"SETTINGS_OPEN inline=1":L"SETTINGS_CLOSE");
     }
     void BuildSettings(){
         auto weak=weak_from_this();settingsPage=ctl::StackPanel();settingsPage.Spacing(6);settingsPage.Visibility(xaml::Visibility::Collapsed);content.Children().Append(settingsPage);
         ctl::Grid heading;Column(heading,36);Column(heading,1,true);ctl::Button back;back.Content(winrt::box_value(L"\u2190"));back.Width(32);back.Height(32);back.MinWidth(0);back.Padding({0,0,0,0});heading.Children().Append(back);
         xaml::Automation::AutomationProperties::SetName(back,qa::Text(L"Вернуться к выбору устройств",L"Back to device selection"));back.Click([weak](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())self->ShowSettings(false);});
         auto title=Label(L"QuickAudio " QA_VERSION_W,15);title.FontWeight({600});title.VerticalAlignment(xaml::VerticalAlignment::Center);ctl::Grid::SetColumn(title,1);heading.Children().Append(title);settingsPage.Children().Append(heading);
-        settingsScroll=ctl::ScrollViewer();settingsScroll.MaxHeight(240);settingsScroll.VerticalScrollBarVisibility(ctl::ScrollBarVisibility::Auto);settingsScroll.HorizontalScrollBarVisibility(ctl::ScrollBarVisibility::Disabled);
+        settingsScroll=ctl::ScrollViewer();settingsScroll.VerticalScrollBarVisibility(ctl::ScrollBarVisibility::Disabled);settingsScroll.HorizontalScrollBarVisibility(ctl::ScrollBarVisibility::Disabled);
         ctl::StackPanel groups;groups.Spacing(6);settingsScroll.Content(groups);settingsPage.Children().Append(settingsScroll);
+        sync=ctl::CheckBox();sync.Content(winrt::box_value(qa::Text(L"Также для звонков",L"Also for calls")));sync.FontSize(13);sync.MinHeight(32);
+        ctl::ToolTipService::SetToolTip(sync,winrt::box_value(qa::Text(L"При выборе менять также устройство связи, используемое приложениями для звонков.",L"Also change the communications device used by calling apps.")));
+        sync.Checked([weak](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())if(!self->updating)self->Request(2,1,L"");});
+        sync.Unchecked([weak](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())if(!self->updating)self->Request(2,0,L"");});
+        groups.Children().Append(sync);
         startup=ctl::CheckBox();startup.Content(winrt::box_value(qa::Text(L"Запускать вместе с Windows",L"Start with Windows")));startup.FontSize(13);groups.Children().Append(startup);
         startup.Checked([weak](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())if(!self->updatingSettings)self->Request(7,1,L"");});
         startup.Unchecked([weak](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())if(!self->updatingSettings)self->Request(7,0,L"");});
@@ -190,35 +189,73 @@ struct View:std::enable_shared_from_this<View>{
         for(int f=0;f<2;++f){sections[f].rows.clear();settingRows[f].clear();}
         builtLanguage=qa::LanguageMode();
         devicesPage=ctl::StackPanel();devicesPage.Spacing(6);content.Children().Append(devicesPage);
+        ctl::Grid header;Column(header,1,true);Column(header,20);Column(header,26);devicesPage.Children().Append(header);
         for(int f=0;f<2;++f){
             auto heading=Label(f?qa::Text(L"Микрофоны",L"Microphones"):qa::Text(L"Устройства вывода",L"Output devices"),14);
-            heading.FontWeight({600});heading.Margin({0,f?6.0:0.0,0,2});devicesPage.Children().Append(heading);
+            heading.FontWeight({600});heading.Margin({0,f?6.0:0.0,0,2});if(f)devicesPage.Children().Append(heading);else{heading.VerticalAlignment(xaml::VerticalAlignment::Center);header.Children().Append(heading);}
             auto& section=sections[f];section.items=ctl::StackPanel();section.items.Spacing(2);
-            section.scroll=ctl::ScrollViewer();section.scroll.HorizontalScrollBarVisibility(ctl::ScrollBarVisibility::Disabled);section.scroll.VerticalScrollBarVisibility(ctl::ScrollBarVisibility::Auto);
-            section.scroll.Content(section.items);section.scroll.MaxHeight(f?92:138);
+            section.scroll=ctl::ScrollViewer();section.scroll.HorizontalScrollBarVisibility(ctl::ScrollBarVisibility::Disabled);section.scroll.VerticalScrollBarVisibility(ctl::ScrollBarVisibility::Disabled);
+            section.scroll.Content(section.items);
             xaml::Automation::AutomationProperties::SetName(section.scroll,f?qa::Text(L"Выбор микрофона",L"Microphone selection"):qa::Text(L"Выбор устройства вывода звука",L"Audio output selection"));
             devicesPage.Children().Append(section.scroll);
             section.empty=Label(qa::Text(L"Доступных устройств нет",L"No devices available"),13);section.empty.Opacity(0.65);devicesPage.Children().Append(section.empty);
         }
-        sync=ctl::CheckBox();sync.Content(winrt::box_value(qa::Text(L"Также для звонков",L"Also for calls")));sync.FontSize(13);sync.MinHeight(32);
-        ctl::ToolTipService::SetToolTip(sync,winrt::box_value(qa::Text(L"При выборе менять также устройство связи, используемое приложениями для звонков.",L"Also change the communications device used by calling apps.")));
         auto weak=weak_from_this();
-        sync.Checked([weak](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())if(!self->updating)self->Request(2,1,L"");});
-        sync.Unchecked([weak](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())if(!self->updating)self->Request(2,0,L"");});
-        ctl::Grid options;options.Height(32);Column(options,1,true);Column(options,24);Column(options,32);options.Children().Append(sync);
-        ctl::Grid indicator;indicator.Width(24);indicator.Height(32);ctl::Grid::SetColumn(indicator,1);options.Children().Append(indicator);
-        progress=ctl::ProgressRing();progress.Width(18);progress.Height(18);progress.MinWidth(0);progress.MinHeight(0);
+        ctl::Grid indicator;indicator.Width(20);indicator.Height(24);ctl::Grid::SetColumn(indicator,1);header.Children().Append(indicator);
+        progress=ctl::ProgressRing();progress.Width(16);progress.Height(16);progress.MinWidth(0);progress.MinHeight(0);
         progress.HorizontalAlignment(xaml::HorizontalAlignment::Center);progress.VerticalAlignment(xaml::VerticalAlignment::Center);
         ctl::ToolTipService::SetToolTip(progress,winrt::box_value(qa::Text(L"Применяем выбор устройства",L"Applying device selection")));indicator.Children().Append(progress);
         status=Label(L"\u26A0",15);status.HorizontalAlignment(xaml::HorizontalAlignment::Center);status.VerticalAlignment(xaml::VerticalAlignment::Center);
         status.Foreground(Brush({255,230,160,45}));indicator.Children().Append(status);
-        settingsButton=ctl::Button();settingsButton.Width(28);settingsButton.Height(28);settingsButton.MinWidth(0);settingsButton.MinHeight(0);settingsButton.Padding({2,2,2,2});
-        settingsButton.VerticalAlignment(xaml::VerticalAlignment::Center);ctl::Grid::SetColumn(settingsButton,2);options.Children().Append(settingsButton);
-        ctl::FontIcon gear;gear.FontFamily(media::FontFamily(L"Segoe Fluent Icons"));gear.Glyph(L"\uE713");gear.FontSize(16);settingsButton.Content(gear);
+        settingsButton=ctl::Button();settingsButton.Width(24);settingsButton.Height(24);settingsButton.MinWidth(0);settingsButton.MinHeight(0);settingsButton.Padding({2,2,2,2});
+        settingsButton.VerticalAlignment(xaml::VerticalAlignment::Center);ctl::Grid::SetColumn(settingsButton,2);header.Children().Append(settingsButton);
+        ctl::FontIcon gear;gear.FontFamily(media::FontFamily(L"Segoe Fluent Icons"));gear.Glyph(L"\uE713");gear.FontSize(14);settingsButton.Content(gear);
         ctl::ToolTipService::SetToolTip(settingsButton,winrt::box_value(qa::Text(L"Настройки аудиопанели",L"Audio panel settings")));xaml::Automation::AutomationProperties::SetName(settingsButton,qa::Text(L"Настройки аудиопанели",L"Audio panel settings"));
         BuildSettings();
-        content.Children().Append(options);Feedback(false);
+        Feedback(false);
         ctl::Border divider;divider.Height(1);divider.Background(Brush({55,128,128,128}));divider.Margin({0,3,0,0});content.Children().Append(divider);
+    }
+    void UpdateHeightBudget(){
+        if(detached || !viewport)return;
+        auto grid=parent.get();if(!grid)return;
+        auto foreground=GetForegroundWindow();MONITORINFO monitor{sizeof(monitor)};
+        if(!GetMonitorInfoW(MonitorFromWindow(foreground,MONITOR_DEFAULTTONEAREST),&monitor))return;
+        double dpi=GetDpiForWindow(foreground);if(dpi<=0)dpi=96;
+        double work=(monitor.rcWork.bottom-monitor.rcWork.top)*96.0/dpi;
+        double surrounding=0;
+        xaml::FrameworkElement child=grid;
+        for(int depth=0;child && depth<12;++depth){
+            auto margin=child.Margin();surrounding+=margin.Top+margin.Bottom;
+            auto ancestor=child.Parent().try_as<xaml::FrameworkElement>();if(!ancestor)break;
+            if(auto border=ancestor.try_as<ctl::Border>()){auto padding=border.Padding();surrounding+=padding.Top+padding.Bottom;}
+            if(auto container=ancestor.try_as<ctl::Panel>()){
+                auto origin=child.TransformToVisual(ancestor).TransformPoint({0,0});
+                for(auto element:container.Children()){
+                    auto sibling=element.try_as<xaml::FrameworkElement>();
+                    if(!sibling || sibling==child || sibling.Visibility()!=xaml::Visibility::Visible || sibling.ActualHeight()<=0)continue;
+                    auto point=sibling.TransformToVisual(ancestor).TransformPoint({0,0});
+                    // Exclude backgrounds/overlays and horizontally adjacent elements.
+                    bool overlapsX=point.X<origin.X+child.ActualWidth() && point.X+sibling.ActualWidth()>origin.X;
+                    bool separateY=point.Y+sibling.ActualHeight()<=origin.Y+1 || point.Y>=origin.Y+child.ActualHeight()-1;
+                    if(overlapsX && separateY){auto m=sibling.Margin();surrounding+=sibling.ActualHeight()+m.Top+m.Bottom;}
+                }
+            }
+            child=ancestor;
+        }
+        // Some Windows builds host the media card outside the L1Grid ancestry.
+        // Use the narrow flyout's overall bounds as a second measurement.
+        RECT window{};
+        if(GetWindowRect(foreground,&window)){
+            double width=(window.right-window.left)*96.0/dpi;
+            double height=(window.bottom-window.top)*96.0/dpi;
+            if(width>0 && width<=grid.ActualWidth()+100 && height<=work+2)
+                surrounding=std::max(surrounding,std::max(0.0,height-grid.ActualHeight()));
+        }
+        double budget=qa::PanelViewport(work,nativeHeight,surrounding);
+        if(std::abs(budget-lastBudget)>0.5){
+            lastBudget=budget;viewport.MaxHeight(budget);
+            Log(L"HEIGHT_BUDGET work="+std::to_wstring(work)+L" native="+std::to_wstring(nativeHeight)+L" surrounding="+std::to_wstring(surrounding)+L" viewport="+std::to_wstring(budget));
+        }
     }
     void Attach(ctl::Grid const& footer){
         auto grid=footer.Parent().try_as<ctl::Grid>();
@@ -229,7 +266,12 @@ struct View:std::enable_shared_from_this<View>{
         if(footerRow<0 || footerRow>=(int)grid.RowDefinitions().Size())throw winrt::hresult_error(E_FAIL,L"Missing footer row");
         parent=winrt::make_weak(grid);
         panel=ctl::Border();panel.Name(L"QuickAudioPanel");panel.Margin({20,14,20,8});panel.Padding({0,0,0,0});
-        content=ctl::StackPanel();content.Spacing(6);panel.Child(content);
+        content=ctl::StackPanel();content.Spacing(6);
+        viewport=ctl::ScrollViewer();viewport.VerticalScrollBarVisibility(ctl::ScrollBarVisibility::Auto);viewport.HorizontalScrollBarVisibility(ctl::ScrollBarVisibility::Disabled);viewport.Content(content);panel.Child(viewport);
+        nativeHeight=grid.ActualHeight();
+        for(auto row:grid.RowDefinitions()){
+            if(row.ActualHeight()>0){rowMinimums.push_back({row,row.ReadLocalValue(ctl::RowDefinition::MinHeightProperty())});row.MinHeight(std::max(row.MinHeight(),row.ActualHeight()));}
+        }
         xaml::Automation::AutomationProperties::SetAutomationId(panel,L"QuickAudioPanel");
         BuildContent();auto weak=weak_from_this();
         extraRow=ctl::RowDefinition();extraRow.Height({1,xaml::GridUnitType::Auto});
@@ -243,6 +285,8 @@ struct View:std::enable_shared_from_this<View>{
             if(!std::isnan(cursor.Height())){heights.push_back({winrt::make_weak(cursor),cursor.ReadLocalValue(xaml::FrameworkElement::HeightProperty())});cursor.Height(NAN);}
             cursor=cursor.Parent().try_as<xaml::FrameworkElement>();
         }
+        UpdateHeightBudget();
+        layoutToken=grid.LayoutUpdated([weak](wf::IInspectable const&,wf::IInspectable const&){if(auto self=weak.lock())try{self->UpdateHeightBudget();}catch(...){Log(L"HEIGHT_BUDGET_ERROR "+Error());}});
         grid.InvalidateMeasure();
         panel.Loaded([weak](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock()){auto b=std::atomic_load(&sharedBus);if(b)b->Send(3,0,L"");}});
         panel.SizeChanged([weak](wf::IInspectable const&,xaml::SizeChangedEventArgs const& e){if(auto self=weak.lock())Log(L"UI_SIZE height="+std::to_wstring(e.NewSize().Height)+L" width="+std::to_wstring(e.NewSize().Width));});
@@ -310,6 +354,8 @@ struct View:std::enable_shared_from_this<View>{
         if(detached)return;detached=true;
         try{
             if(auto grid=parent.get()){
+                grid.LayoutUpdated(layoutToken);
+                for(auto& entry:rowMinimums){if(entry.second==xaml::DependencyProperty::UnsetValue())entry.first.ClearValue(ctl::RowDefinition::MinHeightProperty());else entry.first.SetValue(ctl::RowDefinition::MinHeightProperty(),entry.second);}rowMinimums.clear();
                 uint32_t index;if(panel && grid.Children().IndexOf(panel,index))grid.Children().RemoveAt(index);
                 if(extraRow && grid.RowDefinitions().IndexOf(extraRow,index))grid.RowDefinitions().RemoveAt(index);
                 for(auto& entry:shifted)if(auto f=entry.first.get())ctl::Grid::SetRow(f,entry.second);
@@ -317,7 +363,7 @@ struct View:std::enable_shared_from_this<View>{
                 grid.InvalidateMeasure();
             }
             settingsPage=nullptr;devicesPage=nullptr;settingsScroll=nullptr;startup=nullptr;language=nullptr;settingsButton=nullptr;for(int f=0;f<2;++f){settingRows[f].clear();settingsItems[f]=nullptr;}
-            panel=nullptr;content=nullptr;for(auto& s:sections){s.rows.clear();s.items=nullptr;s.scroll=nullptr;s.empty=nullptr;}sync=nullptr;status=nullptr;progress=nullptr;
+            panel=nullptr;content=nullptr;viewport=nullptr;for(auto& s:sections){s.rows.clear();s.items=nullptr;s.scroll=nullptr;s.empty=nullptr;}sync=nullptr;status=nullptr;progress=nullptr;
             Log(L"UI_REMOVED nativeLayoutRestored=1");
         }catch(...){Log(L"DETACH_ERROR "+Error());}
     }
@@ -387,3 +433,4 @@ struct Factory:winrt::implements<Factory,IClassFactory,winrt::non_agile>{
 STDAPI DllGetClassObject(REFCLSID cls,REFIID iid,void** p){if(cls!=qa::TapClsid)return CLASS_E_CLASSNOTAVAILABLE;try{return winrt::make<Factory>().as(iid,p);}catch(...){return winrt::to_hresult();}}
 STDAPI DllCanUnloadNow(){return S_FALSE;}
 BOOL WINAPI DllMain(HMODULE module,DWORD why,LPVOID){if(why==DLL_PROCESS_ATTACH){moduleHandle=module;DisableThreadLibraryCalls(module);}return TRUE;}
+

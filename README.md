@@ -13,6 +13,7 @@ Select a device with one click, hide unused devices, and give them names you rec
 - Confirmed system defaults and live device connection/disconnection updates.
 - Optional synchronization with the Windows communications device role.
 - Device visibility settings and custom display names, saved by endpoint ID.
+- Compact header and a shared scrolling viewport sized for the monitor and media card.
 - Settings page with scrolling, contained inside Quick Settings.
 - Progress indication that does not change the panel's height.
 - Windows startup toggle in both the panel settings and the standalone control window.
@@ -22,7 +23,7 @@ Select a device with one click, hide unused devices, and give them names you rec
 
 ## Install
 
-Download `QuickAudio-Setup-0.2.3-x64.exe` from [Releases](https://github.com/alexander-62/quick-audio/releases).
+Download `QuickAudio-Setup-0.2.4-x64.exe` from [Releases](https://github.com/alexander-62/quick-audio/releases).
 Run the installer and choose whether to start QuickAudio with Windows. Then press **Win + A**.
 The panel, controls, update messages, and installer support Russian and English.
 Choose **Language → Automatic / Русский / English** below **Start with Windows**
@@ -38,7 +39,7 @@ then click **Enable**. Keep the folder in a stable location if you enable startu
 
 ## Device settings
 
-Use the small gear next to **Also for calls**.
+Use the small gear next to **Output devices**. **Also for calls** is in the settings page.
 The settings page stays inside the panel, with its own scrollbar and a Back button.
 
 - A checked device is visible in our selector; unchecking it does not disable its hardware.
@@ -57,7 +58,7 @@ Some apps apply the change only when a recording/playback session is restarted.
 - Tested on Windows 11 build **26300.9457**; other builds are not yet verified.
 - No separate Visual C++ Redistributable is required; the runtime is linked statically.
 
-This is an early **0.2.3** release. Windows does not offer a stable third-party extension API
+This is an early **0.2.4** release. Windows does not offer a stable third-party extension API
 for this panel. QuickAudio uses XAML Diagnostics and the undocumented PolicyConfig interface.
 Windows updates may require adaptations. Unsupported layouts are logged instead of patched blindly.
 Release binaries are currently unsigned.
@@ -94,7 +95,7 @@ See [development notes](docs/DEVELOPMENT.md) and [testing](docs/TESTING.md).
 
 ## Versioning
 
-Releases use `MAJOR.MINOR.PATCH`, currently **0.2.3**.
+Releases use `MAJOR.MINOR.PATCH`, currently **0.2.4**.
 User-facing version numbers and the internal IPC protocol version are separate.
 Use `scripts/set-version.ps1` when preparing a new release; see [CHANGELOG](CHANGELOG.md).
 Click **Check for updates** in QuickAudio controls, or use the

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.4 — 2026-10-12
+
+- Move Also for calls into settings and put a smaller gear beside Output devices.
+- Reserve the measured native row heights so injected controls do not squeeze system tiles.
+- Bound both custom pages by a shared scroll viewport, accounting for monitor work area, scaling, and vertically adjacent cards.
+- Recalculate on layout changes; restore native row minima and heights on removal.
+- Add layout-budget regression checks for media-card presence, small screens, and DPI conversion.
+
 ## 0.2.3 — 2026-10-12
 
 - Fix language synchronization between controls and the native Quick Settings panel.
