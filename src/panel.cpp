@@ -22,6 +22,7 @@
 #include <vector>
 #include <atomic>
 #include <cmath>
+#include <functional>
 #include <thread>
 namespace wf=winrt::Windows::Foundation;
 namespace xaml=winrt::Windows::UI::Xaml;
@@ -50,6 +51,10 @@ struct SettingRow {
     ctl::TextBox editor{nullptr};ctl::Button save{nullptr};ctl::FontIcon actionIcon{nullptr};
     bool editing=false;unsigned long long pendingRename=0;
 };
+struct NativeRow {
+    ctl::RowDefinition row{nullptr};wf::IInspectable originalMinimum{nullptr};
+    int index=0;double baseline=0,reserved=0;
+};
 struct View:std::enable_shared_from_this<View>{
     winrt::weak_ref<ctl::Grid> parent;
     ctl::Border panel{nullptr};ctl::StackPanel content{nullptr},devicesPage{nullptr},settingsPage{nullptr};
@@ -58,7 +63,7 @@ struct View:std::enable_shared_from_this<View>{
     ctl::ComboBox language{nullptr};qa::Language builtLanguage=qa::LanguageMode();
     ctl::RowDefinition extraRow{nullptr};
     ctl::ScrollViewer viewport{nullptr};double nativeHeight=0,lastBudget=-1;winrt::event_token layoutToken{};
-    std::vector<std::pair<ctl::RowDefinition,wf::IInspectable>> rowMinimums;
+    std::vector<NativeRow> rowMinimums;double nativeBaseline=0;
     std::vector<std::pair<winrt::weak_ref<xaml::FrameworkElement>,int>> shifted;
     std::vector<std::pair<winrt::weak_ref<xaml::FrameworkElement>,wf::IInspectable>> heights;
     std::shared_ptr<qa::State> latest;
@@ -215,9 +220,53 @@ struct View:std::enable_shared_from_this<View>{
         Feedback(false);
         ctl::Border divider;divider.Height(1);divider.Background(Brush({55,128,128,128}));divider.Margin({0,3,0,0});content.Children().Append(divider);
     }
+    double VisibleContentHeight(xaml::FrameworkElement const& root){
+        double height=root.ActualHeight();if(height<=0)return 0;
+        auto rootMargin=root.Margin();
+        double desired=std::max(0.0,static_cast<double>(root.DesiredSize().Height)-rootMargin.Top-rootMargin.Bottom);
+        double extent=std::max(height,std::min(desired,height+64));
+        int remaining=512;
+        std::function<void(xaml::DependencyObject const&,int)> visit=[&](xaml::DependencyObject const& object,int depth){
+            if(depth>16 || --remaining<0)return;
+            if(auto element=object.try_as<xaml::FrameworkElement>()){
+                if(element.Visibility()!=xaml::Visibility::Visible)return;
+                auto point=element.TransformToVisual(root).TransformPoint({0,0});
+                if(point.X>=root.ActualWidth() || point.X+element.ActualWidth()<=0 || point.Y>height+1 || point.Y+element.ActualHeight()<0)return;
+                auto margin=element.Margin();
+                double desiredHeight=std::max(0.0,static_cast<double>(element.DesiredSize().Height)-margin.Top-margin.Bottom);
+                double bottom=point.Y+std::max(element.ActualHeight(),desiredHeight);
+                // Include captions below the viewport, but not other carousel pages.
+                if(element!=root && bottom+margin.Bottom<=height+64)extent=std::max(extent,bottom+margin.Bottom);
+            }
+            int count=media::VisualTreeHelper::GetChildrenCount(object);
+            for(int i=0;i<count && remaining>0;++i)visit(media::VisualTreeHelper::GetChild(object,i),depth+1);
+        };
+        visit(root,0);return extent;
+    }
+    void MeasureNativeRows(){
+        for(auto& native:rowMinimums){
+            double needed=native.baseline;
+            for(auto const& entry:shifted){
+                if(entry.second!=native.index)continue;
+                if(auto element=entry.first.get()){
+                    if(element.Visibility()!=xaml::Visibility::Visible || ctl::Grid::GetRowSpan(element)!=1)continue;
+                    auto margin=element.Margin();
+                    needed=std::max(needed,VisibleContentHeight(element)+margin.Top+margin.Bottom);
+                }
+            }
+            needed=qa::NativeRowHeight(native.baseline,native.reserved,needed);
+            if(needed>native.reserved+0.5){
+                native.reserved=needed;native.row.MinHeight(std::max(native.row.MinHeight(),needed));
+                Log(L"NATIVE_ROW_EXPANDED row="+std::to_wstring(native.index)+L" baseline="+std::to_wstring(native.baseline)+L" content="+std::to_wstring(needed));
+            }
+        }
+        nativeHeight=nativeBaseline;
+        for(auto const& native:rowMinimums)nativeHeight+=native.reserved-native.baseline;
+    }
     void UpdateHeightBudget(){
         if(detached || !viewport)return;
         auto grid=parent.get();if(!grid)return;
+        MeasureNativeRows();
         auto foreground=GetForegroundWindow();MONITORINFO monitor{sizeof(monitor)};
         if(!GetMonitorInfoW(MonitorFromWindow(foreground,MONITOR_DEFAULTTONEAREST),&monitor))return;
         double dpi=GetDpiForWindow(foreground);if(dpi<=0)dpi=96;
@@ -268,9 +317,11 @@ struct View:std::enable_shared_from_this<View>{
         panel=ctl::Border();panel.Name(L"QuickAudioPanel");panel.Margin({20,14,20,8});panel.Padding({0,0,0,0});
         content=ctl::StackPanel();content.Spacing(6);
         viewport=ctl::ScrollViewer();viewport.VerticalScrollBarVisibility(ctl::ScrollBarVisibility::Auto);viewport.HorizontalScrollBarVisibility(ctl::ScrollBarVisibility::Disabled);viewport.Content(content);panel.Child(viewport);
-        nativeHeight=grid.ActualHeight();
+        nativeHeight=nativeBaseline=grid.ActualHeight();int nativeIndex=0;
         for(auto row:grid.RowDefinitions()){
-            if(row.ActualHeight()>0){rowMinimums.push_back({row,row.ReadLocalValue(ctl::RowDefinition::MinHeightProperty())});row.MinHeight(std::max(row.MinHeight(),row.ActualHeight()));}
+            double baseline=row.ActualHeight();
+            rowMinimums.push_back({row,row.ReadLocalValue(ctl::RowDefinition::MinHeightProperty()),nativeIndex++,baseline,baseline});
+            if(baseline>0)row.MinHeight(std::max(row.MinHeight(),baseline));
         }
         xaml::Automation::AutomationProperties::SetAutomationId(panel,L"QuickAudioPanel");
         BuildContent();auto weak=weak_from_this();
@@ -355,7 +406,7 @@ struct View:std::enable_shared_from_this<View>{
         try{
             if(auto grid=parent.get()){
                 grid.LayoutUpdated(layoutToken);
-                for(auto& entry:rowMinimums){if(entry.second==xaml::DependencyProperty::UnsetValue())entry.first.ClearValue(ctl::RowDefinition::MinHeightProperty());else entry.first.SetValue(ctl::RowDefinition::MinHeightProperty(),entry.second);}rowMinimums.clear();
+                for(auto& entry:rowMinimums){if(entry.originalMinimum==xaml::DependencyProperty::UnsetValue())entry.row.ClearValue(ctl::RowDefinition::MinHeightProperty());else entry.row.SetValue(ctl::RowDefinition::MinHeightProperty(),entry.originalMinimum);}rowMinimums.clear();
                 uint32_t index;if(panel && grid.Children().IndexOf(panel,index))grid.Children().RemoveAt(index);
                 if(extraRow && grid.RowDefinitions().IndexOf(extraRow,index))grid.RowDefinitions().RemoveAt(index);
                 for(auto& entry:shifted)if(auto f=entry.first.get())ctl::Grid::SetRow(f,entry.second);

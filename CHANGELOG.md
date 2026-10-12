@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.5 — 2026-10-12
+
+- Measure native child content and caption bounds instead of preserving only already-clipped row heights.
+- Expand native row minima to fit visible tile captions and subtract the extra height from the audio viewport.
+- Retain measured reservations across layout passes to prevent shrinking back to clipped sizes.
+- Add regression tests for a two-row tile viewport with overflowing captions.
+
 ## 0.2.4 — 2026-10-12
 
 - Move Also for calls into settings and put a smaller gear beside Output devices.
