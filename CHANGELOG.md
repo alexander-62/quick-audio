@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.6 — 2026-10-12
+
+- Roll back the adaptive layout changes from 0.2.4/0.2.5 after reports of the panel disappearing on hover.
+- Remove LayoutUpdated-driven visual-tree measurement, native row-minimum changes, and the shared adaptive viewport.
+- Restore the 0.2.3 sizing behavior while retaining the compact gear, settings-only Also for calls, and language synchronization.
+- Native tile clipping with media playback may remain; no desktop verification is claimed.
+
 ## 0.2.5 — 2026-10-12
 
 - Measure native child content and caption bounds instead of preserving only already-clipped row heights.

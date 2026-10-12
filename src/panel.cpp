@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // XAML Diagnostics / COM TAP pattern adapted from m417z/UWPSpy (GPL-3.0).
 #include "shared.h"
-#include "layout.h"
 #include <ocidl.h>
 #include <xamlom.h>
 #include <mmdeviceapi.h>
@@ -22,7 +21,6 @@
 #include <vector>
 #include <atomic>
 #include <cmath>
-#include <functional>
 #include <thread>
 namespace wf=winrt::Windows::Foundation;
 namespace xaml=winrt::Windows::UI::Xaml;
@@ -51,10 +49,6 @@ struct SettingRow {
     ctl::TextBox editor{nullptr};ctl::Button save{nullptr};ctl::FontIcon actionIcon{nullptr};
     bool editing=false;unsigned long long pendingRename=0;
 };
-struct NativeRow {
-    ctl::RowDefinition row{nullptr};wf::IInspectable originalMinimum{nullptr};
-    int index=0;double baseline=0,reserved=0;
-};
 struct View:std::enable_shared_from_this<View>{
     winrt::weak_ref<ctl::Grid> parent;
     ctl::Border panel{nullptr};ctl::StackPanel content{nullptr},devicesPage{nullptr},settingsPage{nullptr};
@@ -62,8 +56,6 @@ struct View:std::enable_shared_from_this<View>{
     ctl::Button settingsButton{nullptr};ctl::ScrollViewer settingsScroll{nullptr};ctl::CheckBox startup{nullptr};ctl::StackPanel settingsItems[2]{nullptr,nullptr};std::vector<SettingRow> settingRows[2];
     ctl::ComboBox language{nullptr};qa::Language builtLanguage=qa::LanguageMode();
     ctl::RowDefinition extraRow{nullptr};
-    ctl::ScrollViewer viewport{nullptr};double nativeHeight=0,lastBudget=-1;winrt::event_token layoutToken{};
-    std::vector<NativeRow> rowMinimums;double nativeBaseline=0;
     std::vector<std::pair<winrt::weak_ref<xaml::FrameworkElement>,int>> shifted;
     std::vector<std::pair<winrt::weak_ref<xaml::FrameworkElement>,wf::IInspectable>> heights;
     std::shared_ptr<qa::State> latest;
@@ -112,16 +104,25 @@ struct View:std::enable_shared_from_this<View>{
         for(auto& row:settingRows[flow])if(id==row.device.id && row.editing && !row.pendingRename){SetEditing(row,false,true);return;}
     }
     void ShowSettings(bool show){
+        if(show){
+            auto foreground=GetForegroundWindow();MONITORINFO monitor{sizeof(monitor)};
+            if(GetMonitorInfoW(MonitorFromWindow(foreground,MONITOR_DEFAULTTONEAREST),&monitor)){
+                double dpi=GetDpiForWindow(foreground);if(dpi<=0)dpi=96;
+                double available=(monitor.rcWork.bottom-monitor.rcWork.top)*96.0/dpi;
+                double native=333;if(auto grid=parent.get())native=std::max(0.0,grid.ActualHeight()-panel.ActualHeight());
+                settingsScroll.MaxHeight(std::clamp(available-native-130,96.0,240.0));
+            }
+        }
         if(!show)for(auto& group:settingRows)for(auto& row:group)if(row.editing && !row.pendingRename)SetEditing(row,false);
         settingsOpen=show;devicesPage.Visibility(show?xaml::Visibility::Collapsed:xaml::Visibility::Visible);settingsPage.Visibility(show?xaml::Visibility::Visible:xaml::Visibility::Collapsed);
-        UpdateHeightBudget();Log(show?L"SETTINGS_OPEN inline=1":L"SETTINGS_CLOSE");
+        Log(show?L"SETTINGS_OPEN inline=1":L"SETTINGS_CLOSE");
     }
     void BuildSettings(){
         auto weak=weak_from_this();settingsPage=ctl::StackPanel();settingsPage.Spacing(6);settingsPage.Visibility(xaml::Visibility::Collapsed);content.Children().Append(settingsPage);
         ctl::Grid heading;Column(heading,36);Column(heading,1,true);ctl::Button back;back.Content(winrt::box_value(L"\u2190"));back.Width(32);back.Height(32);back.MinWidth(0);back.Padding({0,0,0,0});heading.Children().Append(back);
         xaml::Automation::AutomationProperties::SetName(back,qa::Text(L"Вернуться к выбору устройств",L"Back to device selection"));back.Click([weak](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock())self->ShowSettings(false);});
         auto title=Label(L"QuickAudio " QA_VERSION_W,15);title.FontWeight({600});title.VerticalAlignment(xaml::VerticalAlignment::Center);ctl::Grid::SetColumn(title,1);heading.Children().Append(title);settingsPage.Children().Append(heading);
-        settingsScroll=ctl::ScrollViewer();settingsScroll.VerticalScrollBarVisibility(ctl::ScrollBarVisibility::Disabled);settingsScroll.HorizontalScrollBarVisibility(ctl::ScrollBarVisibility::Disabled);
+        settingsScroll=ctl::ScrollViewer();settingsScroll.MaxHeight(240);settingsScroll.VerticalScrollBarVisibility(ctl::ScrollBarVisibility::Auto);settingsScroll.HorizontalScrollBarVisibility(ctl::ScrollBarVisibility::Disabled);
         ctl::StackPanel groups;groups.Spacing(6);settingsScroll.Content(groups);settingsPage.Children().Append(settingsScroll);
         sync=ctl::CheckBox();sync.Content(winrt::box_value(qa::Text(L"Также для звонков",L"Also for calls")));sync.FontSize(13);sync.MinHeight(32);
         ctl::ToolTipService::SetToolTip(sync,winrt::box_value(qa::Text(L"При выборе менять также устройство связи, используемое приложениями для звонков.",L"Also change the communications device used by calling apps.")));
@@ -199,8 +200,8 @@ struct View:std::enable_shared_from_this<View>{
             auto heading=Label(f?qa::Text(L"Микрофоны",L"Microphones"):qa::Text(L"Устройства вывода",L"Output devices"),14);
             heading.FontWeight({600});heading.Margin({0,f?6.0:0.0,0,2});if(f)devicesPage.Children().Append(heading);else{heading.VerticalAlignment(xaml::VerticalAlignment::Center);header.Children().Append(heading);}
             auto& section=sections[f];section.items=ctl::StackPanel();section.items.Spacing(2);
-            section.scroll=ctl::ScrollViewer();section.scroll.HorizontalScrollBarVisibility(ctl::ScrollBarVisibility::Disabled);section.scroll.VerticalScrollBarVisibility(ctl::ScrollBarVisibility::Disabled);
-            section.scroll.Content(section.items);
+            section.scroll=ctl::ScrollViewer();section.scroll.HorizontalScrollBarVisibility(ctl::ScrollBarVisibility::Disabled);section.scroll.VerticalScrollBarVisibility(ctl::ScrollBarVisibility::Auto);
+            section.scroll.Content(section.items);section.scroll.MaxHeight(f?92:138);
             xaml::Automation::AutomationProperties::SetName(section.scroll,f?qa::Text(L"Выбор микрофона",L"Microphone selection"):qa::Text(L"Выбор устройства вывода звука",L"Audio output selection"));
             devicesPage.Children().Append(section.scroll);
             section.empty=Label(qa::Text(L"Доступных устройств нет",L"No devices available"),13);section.empty.Opacity(0.65);devicesPage.Children().Append(section.empty);
@@ -220,92 +221,6 @@ struct View:std::enable_shared_from_this<View>{
         Feedback(false);
         ctl::Border divider;divider.Height(1);divider.Background(Brush({55,128,128,128}));divider.Margin({0,3,0,0});content.Children().Append(divider);
     }
-    double VisibleContentHeight(xaml::FrameworkElement const& root){
-        double height=root.ActualHeight();if(height<=0)return 0;
-        auto rootMargin=root.Margin();
-        double desired=std::max(0.0,static_cast<double>(root.DesiredSize().Height)-rootMargin.Top-rootMargin.Bottom);
-        double extent=std::max(height,std::min(desired,height+64));
-        int remaining=512;
-        std::function<void(xaml::DependencyObject const&,int)> visit=[&](xaml::DependencyObject const& object,int depth){
-            if(depth>16 || --remaining<0)return;
-            if(auto element=object.try_as<xaml::FrameworkElement>()){
-                if(element.Visibility()!=xaml::Visibility::Visible)return;
-                auto point=element.TransformToVisual(root).TransformPoint({0,0});
-                if(point.X>=root.ActualWidth() || point.X+element.ActualWidth()<=0 || point.Y>height+1 || point.Y+element.ActualHeight()<0)return;
-                auto margin=element.Margin();
-                double desiredHeight=std::max(0.0,static_cast<double>(element.DesiredSize().Height)-margin.Top-margin.Bottom);
-                double bottom=point.Y+std::max(element.ActualHeight(),desiredHeight);
-                // Include captions below the viewport, but not other carousel pages.
-                if(element!=root && bottom+margin.Bottom<=height+64)extent=std::max(extent,bottom+margin.Bottom);
-            }
-            int count=media::VisualTreeHelper::GetChildrenCount(object);
-            for(int i=0;i<count && remaining>0;++i)visit(media::VisualTreeHelper::GetChild(object,i),depth+1);
-        };
-        visit(root,0);return extent;
-    }
-    void MeasureNativeRows(){
-        for(auto& native:rowMinimums){
-            double needed=native.baseline;
-            for(auto const& entry:shifted){
-                if(entry.second!=native.index)continue;
-                if(auto element=entry.first.get()){
-                    if(element.Visibility()!=xaml::Visibility::Visible || ctl::Grid::GetRowSpan(element)!=1)continue;
-                    auto margin=element.Margin();
-                    needed=std::max(needed,VisibleContentHeight(element)+margin.Top+margin.Bottom);
-                }
-            }
-            needed=qa::NativeRowHeight(native.baseline,native.reserved,needed);
-            if(needed>native.reserved+0.5){
-                native.reserved=needed;native.row.MinHeight(std::max(native.row.MinHeight(),needed));
-                Log(L"NATIVE_ROW_EXPANDED row="+std::to_wstring(native.index)+L" baseline="+std::to_wstring(native.baseline)+L" content="+std::to_wstring(needed));
-            }
-        }
-        nativeHeight=nativeBaseline;
-        for(auto const& native:rowMinimums)nativeHeight+=native.reserved-native.baseline;
-    }
-    void UpdateHeightBudget(){
-        if(detached || !viewport)return;
-        auto grid=parent.get();if(!grid)return;
-        MeasureNativeRows();
-        auto foreground=GetForegroundWindow();MONITORINFO monitor{sizeof(monitor)};
-        if(!GetMonitorInfoW(MonitorFromWindow(foreground,MONITOR_DEFAULTTONEAREST),&monitor))return;
-        double dpi=GetDpiForWindow(foreground);if(dpi<=0)dpi=96;
-        double work=(monitor.rcWork.bottom-monitor.rcWork.top)*96.0/dpi;
-        double surrounding=0;
-        xaml::FrameworkElement child=grid;
-        for(int depth=0;child && depth<12;++depth){
-            auto margin=child.Margin();surrounding+=margin.Top+margin.Bottom;
-            auto ancestor=child.Parent().try_as<xaml::FrameworkElement>();if(!ancestor)break;
-            if(auto border=ancestor.try_as<ctl::Border>()){auto padding=border.Padding();surrounding+=padding.Top+padding.Bottom;}
-            if(auto container=ancestor.try_as<ctl::Panel>()){
-                auto origin=child.TransformToVisual(ancestor).TransformPoint({0,0});
-                for(auto element:container.Children()){
-                    auto sibling=element.try_as<xaml::FrameworkElement>();
-                    if(!sibling || sibling==child || sibling.Visibility()!=xaml::Visibility::Visible || sibling.ActualHeight()<=0)continue;
-                    auto point=sibling.TransformToVisual(ancestor).TransformPoint({0,0});
-                    // Exclude backgrounds/overlays and horizontally adjacent elements.
-                    bool overlapsX=point.X<origin.X+child.ActualWidth() && point.X+sibling.ActualWidth()>origin.X;
-                    bool separateY=point.Y+sibling.ActualHeight()<=origin.Y+1 || point.Y>=origin.Y+child.ActualHeight()-1;
-                    if(overlapsX && separateY){auto m=sibling.Margin();surrounding+=sibling.ActualHeight()+m.Top+m.Bottom;}
-                }
-            }
-            child=ancestor;
-        }
-        // Some Windows builds host the media card outside the L1Grid ancestry.
-        // Use the narrow flyout's overall bounds as a second measurement.
-        RECT window{};
-        if(GetWindowRect(foreground,&window)){
-            double width=(window.right-window.left)*96.0/dpi;
-            double height=(window.bottom-window.top)*96.0/dpi;
-            if(width>0 && width<=grid.ActualWidth()+100 && height<=work+2)
-                surrounding=std::max(surrounding,std::max(0.0,height-grid.ActualHeight()));
-        }
-        double budget=qa::PanelViewport(work,nativeHeight,surrounding);
-        if(std::abs(budget-lastBudget)>0.5){
-            lastBudget=budget;viewport.MaxHeight(budget);
-            Log(L"HEIGHT_BUDGET work="+std::to_wstring(work)+L" native="+std::to_wstring(nativeHeight)+L" surrounding="+std::to_wstring(surrounding)+L" viewport="+std::to_wstring(budget));
-        }
-    }
     void Attach(ctl::Grid const& footer){
         auto grid=footer.Parent().try_as<ctl::Grid>();
         if(!grid || grid.Name()!=L"L1Grid")throw winrt::hresult_error(E_FAIL,L"Unsupported Quick Settings layout");
@@ -315,14 +230,7 @@ struct View:std::enable_shared_from_this<View>{
         if(footerRow<0 || footerRow>=(int)grid.RowDefinitions().Size())throw winrt::hresult_error(E_FAIL,L"Missing footer row");
         parent=winrt::make_weak(grid);
         panel=ctl::Border();panel.Name(L"QuickAudioPanel");panel.Margin({20,14,20,8});panel.Padding({0,0,0,0});
-        content=ctl::StackPanel();content.Spacing(6);
-        viewport=ctl::ScrollViewer();viewport.VerticalScrollBarVisibility(ctl::ScrollBarVisibility::Auto);viewport.HorizontalScrollBarVisibility(ctl::ScrollBarVisibility::Disabled);viewport.Content(content);panel.Child(viewport);
-        nativeHeight=nativeBaseline=grid.ActualHeight();int nativeIndex=0;
-        for(auto row:grid.RowDefinitions()){
-            double baseline=row.ActualHeight();
-            rowMinimums.push_back({row,row.ReadLocalValue(ctl::RowDefinition::MinHeightProperty()),nativeIndex++,baseline,baseline});
-            if(baseline>0)row.MinHeight(std::max(row.MinHeight(),baseline));
-        }
+        content=ctl::StackPanel();content.Spacing(6);panel.Child(content);
         xaml::Automation::AutomationProperties::SetAutomationId(panel,L"QuickAudioPanel");
         BuildContent();auto weak=weak_from_this();
         extraRow=ctl::RowDefinition();extraRow.Height({1,xaml::GridUnitType::Auto});
@@ -336,8 +244,6 @@ struct View:std::enable_shared_from_this<View>{
             if(!std::isnan(cursor.Height())){heights.push_back({winrt::make_weak(cursor),cursor.ReadLocalValue(xaml::FrameworkElement::HeightProperty())});cursor.Height(NAN);}
             cursor=cursor.Parent().try_as<xaml::FrameworkElement>();
         }
-        UpdateHeightBudget();
-        layoutToken=grid.LayoutUpdated([weak](wf::IInspectable const&,wf::IInspectable const&){if(auto self=weak.lock())try{self->UpdateHeightBudget();}catch(...){Log(L"HEIGHT_BUDGET_ERROR "+Error());}});
         grid.InvalidateMeasure();
         panel.Loaded([weak](wf::IInspectable const&,xaml::RoutedEventArgs const&){if(auto self=weak.lock()){auto b=std::atomic_load(&sharedBus);if(b)b->Send(3,0,L"");}});
         panel.SizeChanged([weak](wf::IInspectable const&,xaml::SizeChangedEventArgs const& e){if(auto self=weak.lock())Log(L"UI_SIZE height="+std::to_wstring(e.NewSize().Height)+L" width="+std::to_wstring(e.NewSize().Width));});
@@ -405,8 +311,6 @@ struct View:std::enable_shared_from_this<View>{
         if(detached)return;detached=true;
         try{
             if(auto grid=parent.get()){
-                grid.LayoutUpdated(layoutToken);
-                for(auto& entry:rowMinimums){if(entry.originalMinimum==xaml::DependencyProperty::UnsetValue())entry.row.ClearValue(ctl::RowDefinition::MinHeightProperty());else entry.row.SetValue(ctl::RowDefinition::MinHeightProperty(),entry.originalMinimum);}rowMinimums.clear();
                 uint32_t index;if(panel && grid.Children().IndexOf(panel,index))grid.Children().RemoveAt(index);
                 if(extraRow && grid.RowDefinitions().IndexOf(extraRow,index))grid.RowDefinitions().RemoveAt(index);
                 for(auto& entry:shifted)if(auto f=entry.first.get())ctl::Grid::SetRow(f,entry.second);
@@ -414,7 +318,7 @@ struct View:std::enable_shared_from_this<View>{
                 grid.InvalidateMeasure();
             }
             settingsPage=nullptr;devicesPage=nullptr;settingsScroll=nullptr;startup=nullptr;language=nullptr;settingsButton=nullptr;for(int f=0;f<2;++f){settingRows[f].clear();settingsItems[f]=nullptr;}
-            panel=nullptr;content=nullptr;viewport=nullptr;for(auto& s:sections){s.rows.clear();s.items=nullptr;s.scroll=nullptr;s.empty=nullptr;}sync=nullptr;status=nullptr;progress=nullptr;
+            panel=nullptr;content=nullptr;for(auto& s:sections){s.rows.clear();s.items=nullptr;s.scroll=nullptr;s.empty=nullptr;}sync=nullptr;status=nullptr;progress=nullptr;
             Log(L"UI_REMOVED nativeLayoutRestored=1");
         }catch(...){Log(L"DETACH_ERROR "+Error());}
     }
@@ -484,4 +388,3 @@ struct Factory:winrt::implements<Factory,IClassFactory,winrt::non_agile>{
 STDAPI DllGetClassObject(REFCLSID cls,REFIID iid,void** p){if(cls!=qa::TapClsid)return CLASS_E_CLASSNOTAVAILABLE;try{return winrt::make<Factory>().as(iid,p);}catch(...){return winrt::to_hresult();}}
 STDAPI DllCanUnloadNow(){return S_FALSE;}
 BOOL WINAPI DllMain(HMODULE module,DWORD why,LPVOID){if(why==DLL_PROCESS_ATTACH){moduleHandle=module;DisableThreadLibraryCalls(module);}return TRUE;}
-
