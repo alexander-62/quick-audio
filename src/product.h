@@ -12,9 +12,9 @@ inline std::wstring DataDir(){
         if(result.empty())return std::wstring();result+=L"\\QuickAudio\\";CreateDirectoryW(result.c_str(),nullptr);return result;
     }();return path;
 }
-inline std::wstring SettingsFile(){return DataDir()+L"settings.ini";}
+inline std::wstring SettingsFile(){auto dir=DataDir();return dir.empty()?std::wstring():dir+L"settings.ini";}
 inline bool EnsureSettings(){
-    auto file=SettingsFile();auto h=CreateFileW(file.c_str(),GENERIC_WRITE,FILE_SHARE_READ,nullptr,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,nullptr);
+    auto file=SettingsFile();if(file.empty()){SetLastError(ERROR_PATH_NOT_FOUND);return false;}auto h=CreateFileW(file.c_str(),GENERIC_WRITE,FILE_SHARE_READ,nullptr,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,nullptr);
     if(h==INVALID_HANDLE_VALUE)return GetLastError()==ERROR_FILE_EXISTS;
     const wchar_t bom=0xFEFF;DWORD written=0;bool ok=WriteFile(h,&bom,2,&written,nullptr)!=0 && written==2;CloseHandle(h);return ok;
 }

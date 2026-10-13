@@ -106,3 +106,16 @@ window follows, and relaunching preserves the choice. Automatic follows the Wind
 display language. Confirm device aliases, hidden devices, audio defaults, and startup
 remain unchanged. Check keyboard operation, screen reader labels, scaling, a failed
 settings write, and language changes during an update or audio-service reconnection.
+
+## Device preference persistence
+
+Run `tests/build-preferences.cmd` and `build/preferences-test.exe`.
+The test uses a temporary UTF-16 settings file, writes Unicode and quoted names
+and visibility for both device flows, then launches a separate reader process.
+The child verifies persisted values, clears one alias and hidden flag, and the
+parent verifies unrelated microphone values survived. Locked/missing files,
+invalid flows, zero Win32 error handling, and missing LOCALAPPDATA are checked.
+No real audio defaults or account preferences are modified.
+
+On a desktop, rename/hide devices, click Settings folder, verify the report matches
+the displayed state and exact settings file, then reboot and compare endpoint IDs.

@@ -79,3 +79,10 @@ the current installer without executing it; its temporary download is removed.
 
 Keep the Inno Setup AppId stable across releases
 so installing a later version updates the existing per-user product.
+
+## Preference diagnostics
+
+IPC request 10 refreshes `QuickAudio-diagnostics.txt` and opens the running agent's
+DataDir. The report uses that process's exact SettingsFile and current endpoint
+snapshot. Its absent-ID section includes inactive devices as well as possibly
+changed IDs; it is not an automatic alias migration.

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.7 — 2026-10-13
+
+- Reject missing settings paths instead of falling back to a relative settings.ini.
+- Flush and verify device alias/visibility writes before acknowledging requests; failed writes cannot report success with a zero Win32 error.
+- Detect unreadable settings rather than show all preferences as defaults.
+- Log dated settings paths, executable paths, and endpoint IDs with aliases/visibility on changes.
+- Generate QuickAudio-diagnostics.txt from the active agent; Settings folder opens that agent's folder and refreshes the report.
+- Test Unicode/quoted names and visibility across a separate process, locked/missing files, deletions, and missing LOCALAPPDATA.
+
 ## 0.2.6 — 2026-10-12
 
 - Roll back the adaptive layout changes from 0.2.4/0.2.5 after reports of the panel disappearing on hover.

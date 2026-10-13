@@ -165,7 +165,7 @@ inline LRESULT CALLBACK ManagerProc(HWND window,UINT message,WPARAM wp,LPARAM lp
         if(id==108 && HIWORD(wp)==CBN_SELCHANGE){auto index=SendMessageW(language,CB_GETCURSEL,0,0);ok=index>=0 && index<=2 && SetLanguage(static_cast<Language>(index));if(ok){Bus bus;if(bus.Open(false))SetEvent(bus.command);}}
         else if(id==101)ok=LaunchAgent();else if(id==102)ok=StopAgent()==0;
         else if(id==103)ok=SetStartup(SendMessageW(startup,BM_GETCHECK,0,0)==BST_CHECKED,ExePath())==ERROR_SUCCESS;
-        else if(id==104)ShellExecuteW(window,L"open",DataDir().c_str(),nullptr,nullptr,SW_SHOWNORMAL);
+        else if(id==104){Bus bus;if(bus.Open(false))ok=bus.Send(10,0,L"");else ok=reinterpret_cast<INT_PTR>(ShellExecuteW(window,L"open",DataDir().c_str(),nullptr,nullptr,SW_SHOWNORMAL))>32;}
         else if(id==105)ShellExecuteW(window,L"open",L"https://github.com/alexander-62/quick-audio",nullptr,nullptr,SW_SHOWNORMAL);
         else if(id==106){
             UpdateStage stage;updates::Release release;bool installed;

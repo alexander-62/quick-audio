@@ -28,6 +28,12 @@ jobs:
           call tests\build-language.cmd
           if errorlevel 1 exit /b 1
           build\language-test.exe
+      - name: Test device preference persistence
+        shell: cmd
+        run: |
+          call tests\build-preferences.cmd
+          if errorlevel 1 exit /b 1
+          build\preferences-test.exe
       - name: Build installer and portable package
         shell: pwsh
         run: ./scripts/package.ps1

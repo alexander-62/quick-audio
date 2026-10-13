@@ -39,11 +39,11 @@ inline std::wstring ExeDir() { wchar_t p[32768]; GetModuleFileNameW(nullptr,p,32
 inline bool Log(std::wstring const& dir,std::wstring const& message) noexcept {
     static std::mutex lock; std::lock_guard<std::mutex> guard(lock);
     SYSTEMTIME st; GetLocalTime(&st); wchar_t prefix[128];
-    swprintf_s(prefix,L"%02d:%02d:%02d pid=%lu tid=%lu ",st.wHour,st.wMinute,st.wSecond,GetCurrentProcessId(),GetCurrentThreadId());
+    swprintf_s(prefix,L"%04d-%02d-%02d %02d:%02d:%02d pid=%lu tid=%lu ",st.wYear,st.wMonth,st.wDay,st.wHour,st.wMinute,st.wSecond,GetCurrentProcessId(),GetCurrentThreadId());
     auto w=std::wstring(prefix)+message+L"\r\n";
     int n=WideCharToMultiByte(CP_UTF8,0,w.c_str(),(int)w.size(),nullptr,0,nullptr,nullptr);
     std::string data(n,'\0'); WideCharToMultiByte(CP_UTF8,0,w.c_str(),(int)w.size(),data.data(),n,nullptr,nullptr);
-    (void)dir;auto path=DataDir()+L"QuickAudio.log";
+    (void)dir;auto dataDir=DataDir();if(dataDir.empty())return false;auto path=dataDir+L"QuickAudio.log";
     WIN32_FILE_ATTRIBUTE_DATA info{};if(GetFileAttributesExW(path.c_str(),GetFileExInfoStandard,&info) && (info.nFileSizeHigh || info.nFileSizeLow>1024*1024))MoveFileExW(path.c_str(),(DataDir()+L"QuickAudio.previous.log").c_str(),MOVEFILE_REPLACE_EXISTING);
     auto h=CreateFileW(path.c_str(),FILE_APPEND_DATA,FILE_SHARE_READ|FILE_SHARE_WRITE,nullptr,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,nullptr);
     if(h!=INVALID_HANDLE_VALUE) {DWORD written;bool ok=WriteFile(h,data.data(),(DWORD)data.size(),&written,nullptr)!=0;CloseHandle(h);return ok;}return false;
